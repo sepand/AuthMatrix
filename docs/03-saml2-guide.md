@@ -35,7 +35,15 @@ Welcome to Phase 3 of **AuthMatrix**. Security Assertion Markup Language (SAML 2
 
 ---
 
-## 3. Official Platform SAML Guides
+## 3. Step-by-Step IdP Attribute Statements & Claims Mapping Instructions
+
+For complete click-by-click instructions on where to find and configure Attribute Statements in your identity provider portal, refer to Phase 0:
+* **Okta SAML Attribute Statements Setup:** See [Phase 0 Setup Guide (Section 1.D)](00-tenant-setup-guide.md#d-configure-okta-saml-20-web-application--attribute-statements-phase-3)
+* **Microsoft Entra ID SAML Attributes & Claims Setup:** See [Phase 0 Setup Guide (Section 2.D)](00-tenant-setup-guide.md#d-configure-microsoft-entra-enterprise-saml-application--attributesclaims-phase-3)
+
+---
+
+## 4. Official Platform SAML Guides
 
 * **Okta SAML 2.0 Integration Guide:** [Okta SAML 2.0 Developer Documentation](https://developer.okta.com/docs/concepts/saml/)
 * **Microsoft Entra ID SAML Protocol:** [Microsoft Entra ID SAML 2.0 Single Sign-On](https://learn.microsoft.com/en-us/entra/identity-platform/single-sign-on-saml-protocol)
