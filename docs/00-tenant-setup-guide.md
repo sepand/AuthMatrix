@@ -61,43 +61,57 @@ Welcome to Phase 0 of **AuthMatrix**. This guide provides click-by-click, detail
 ---
 
 ### D. Configure Okta SAML 2.0 Web Application & Attribute Statements (Phase 3)
+
 1. In the left navigation menu, go to **Applications** $\rightarrow$ **Applications**.
 2. Click **Create App Integration** $\rightarrow$ Select **SAML 2.0** $\rightarrow$ Click **Next**.
 3. **Step 1: General Settings:**
-   * **App name:** Enter `AuthMatrix SAML App`.
-   * Click **Next**.
+   * **App name:** Enter `AuthMatrix SAML App` $\rightarrow$ Click **Next**.
 4. **Step 2: Configure SAML (General Settings):**
    * **Single Sign-On URL (ACS URL):** Enter `http://localhost:3000/saml/acs`.
    * Check **Use this for Recipient URL and Destination URL**.
    * **Audience URI (SP Entity ID):** Enter `https://authmatrix-sp.local`.
    * **Name ID format:** Select `EmailAddress`.
    * **Application username:** Select `Email`.
-   * Click **Next**, select **I'm an Okta customer adding an internal app**, and click **Finish**.
-5. **Step 2: Configure SAML (Attribute Statements & Claims Mapping):**
-   * On the exact same **Step 2** page, scroll down to the section titled **Attribute Statements (optional)**.
-   * Click **Add Another** for each attribute below:
+5. **Step 3: Finish Wizard:**
+   * Click **Next** at the bottom.
+   * Select **I'm an Okta customer adding an internal app** $\rightarrow$ Click **Finish**.
 
-     | Name | Name format (Dropdown) | Value (Dropdown / Input) |
-     | :--- | :--- | :--- |
-     | `email` | `Unspecified` | `user.email` |
-     | `firstName` | `Unspecified` | `user.firstName` |
-     | `lastName` | `Unspecified` | `user.lastName` |
+---
 
-   * Scroll down further on the same page to **Group Attribute Statements (optional)**:
-     * **Name:** Enter `groups`
-     * **Name format:** Select `Unspecified`
-     * **Filter:** Select `Matches regex` from the dropdown
-     * **Value:** Type `.*` (matches all groups assigned to the user)
-6. Click **Next** at the bottom of the page.
-7. **Step 3: Feedback:**
-   * Select **I'm an Okta customer adding an internal app**.
-   * Click **Finish**.
-8. **Exporting SAML Certificates & Metadata (After clicking Finish):**
-   * Once you click **Finish**, Okta redirects you to your newly created SAML application page.
-   * Click the **Sign On** tab.
-   * Scroll down to the **SAML Setup** box on the right.
-   * Click **View SAML setup instructions** (or click **Metadata Details** to copy the Metadata URL / Certificate).
-   * Copy the **Identity Provider Single Sign-On URL** and **X.509 Certificate** into your `.env` file (`OKTA_SAML_ENTRY_POINT`, `OKTA_SAML_CERT`).
+### E. How to Configure Attribute Statements (Claims Mapping) in Okta
+
+*Okta features two UI layouts depending on your tenant version. Follow either **Path 1 (New UI)** or **Path 2 (Legacy UI)** below:*
+
+#### 🔹 Path 1: New Okta UI ("Add expression" Modal)
+1. On your app page, click the **Sign On** tab.
+2. Scroll down to the **Attribute statements** section.
+3. Click the blue **Add expression** button.
+4. In the **Add expression** modal popup, enter:
+   * **Name:** `email`
+   * **Expression:** `user.email`
+   * Click **Save**.
+5. Click **Add expression** again for each additional attribute:
+   * **Name:** `firstName` | **Expression:** `user.firstName` $\rightarrow$ click **Save**
+   * **Name:** `lastName` | **Expression:** `user.lastName` $\rightarrow$ click **Save**
+   * **Name:** `groups` | **Expression:** `user.getGroups()` $\rightarrow$ click **Save**
+
+#### 🔹 Path 2: Classic / Legacy Okta UI ("Show legacy configuration")
+1. On the **Sign On** tab, scroll down to the bottom and click **Show legacy configuration**.
+2. Click **Edit** on SAML 2.0 settings.
+3. Under **Attribute Statements (optional)**, enter:
+   * **Name:** `email` | **Name format:** `Unspecified` | **Value:** `user.email`
+   * **Name:** `firstName` | **Name format:** `Unspecified` | **Value:** `user.firstName`
+   * **Name:** `lastName` | **Name format:** `Unspecified` | **Value:** `user.lastName`
+4. Under **Group Attribute Statements (optional)**:
+   * **Name:** `groups` | **Name format:** `Unspecified` | **Filter:** `Matches regex` | **Value:** `.*`
+5. Click **Save**.
+
+---
+
+### F. Exporting Okta SAML Certificates & Metadata
+1. On the **Sign On** tab, scroll down to the **SAML Setup** box on the right.
+2. Click **View SAML setup instructions** (or click **Metadata Details** to copy the Metadata URL / Certificate).
+3. Copy the **Identity Provider Single Sign-On URL** and **X.509 Certificate** into your `.env` file (`OKTA_SAML_ENTRY_POINT`, `OKTA_SAML_CERT`).
 
 ---
 
