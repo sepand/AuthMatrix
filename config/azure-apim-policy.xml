@@ -1,41 +1,280 @@
-<!-- ⚡ AuthMatrix Azure API Management (APIM) Policy Template -->
+<!--
+  AuthMatrix — Azure API Management Inbound Policy
+  ADR Reference: ADR-SEC-2026-001 (Dual-IdP Identity Federation)
+
+  Purpose:
+    Single gateway enforcement point for BOTH Okta and Microsoft Entra ID tokens.
+    Implements JWT validation, claim normalization, and secure header injection
+    per the Zero Trust "Assume Breach" and "Verify Explicitly" principles.
+
+  Zero Trust Enforcement Order:
+    1. Strip untrusted X-User-* headers  →  prevent header spoofing
+    2. Detect token issuer (iss claim)   →  route to correct JWKS validator
+    3a. Validate Okta JWT via JWKS        →  cryptographic signature check
+    3b. Validate Entra JWT via JWKS       →  cryptographic signature check
+    4. Normalize claims to common schema  →  IdP-agnostic backend headers
+    5. Inject verified headers            →  X-User-Id, X-App-Roles, X-Idp-Source
+    6. Remove raw Authorization header    →  backends never see raw tokens
+-->
 <policies>
     <inbound>
         <base />
-        
-        <!-- 1. Strip untrusted external client headers -->
-        <set-header name="X-User-Id" exists-action="delete" />
-        <set-header name="X-User-Roles" exists-action="delete" />
-        <set-header name="X-User-Permissions" exists-action="delete" />
 
-        <!-- 2. Edge JWT Signature & Claim Validation (Okta / Entra ID) -->
-        <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized: Invalid Bearer token" require-scheme="Bearer">
-            <openid-config url="https://login.microsoftonline.com/{{ENTRA_TENANT_ID}}/v2.0/.well-known/openid-configuration" />
-            <required-claims>
-                <claim name="aud" match="any">
-                    <value>https://api.authmatrix.local</value>
-                </claim>
-            </required-claims>
-        </validate-jwt>
+        <!--
+          ══════════════════════════════════════════════════════════════
+          STEP 1 — Zero Trust: Strip ALL untrusted client-supplied headers
+          CRITICAL: Must execute BEFORE any other logic.
+          Prevents attackers pre-injecting X-App-Roles, X-User-Id headers.
+          ══════════════════════════════════════════════════════════════
+        -->
+        <set-header name="X-User-Id"    exists-action="delete" />
+        <set-header name="X-User-Email" exists-action="delete" />
+        <set-header name="X-App-Roles"  exists-action="delete" />
+        <set-header name="X-Idp-Source" exists-action="delete" />
 
-        <!-- 3. Extract Claims & Inject Trusted Internal Headers -->
-        <set-variable name="user-id" value="@(context.Request.Headers.GetValueOrDefault("Authorization","").AsJwt()?.Subject)" />
-        <set-variable name="user-roles" value="@(string.Join(",", context.Request.Headers.GetValueOrDefault("Authorization","").AsJwt()?.Claims.GetValueOrDefault("roles", new string[0])))" />
+        <!--
+          ══════════════════════════════════════════════════════════════
+          STEP 2 — Extract token issuer (iss) for routing decision
+          Note: This reads the JWT without full validation yet.
+                Full cryptographic validation happens per-IdP in Step 3.
+          ══════════════════════════════════════════════════════════════
+        -->
+        <set-variable name="tokenIssuer"
+            value="@(context.Request.Headers
+                      .GetValueOrDefault("Authorization", "")
+                      .AsJwt()?.Issuer ?? "")" />
 
+        <!--
+          ══════════════════════════════════════════════════════════════
+          STEP 3A — Validate Okta-issued JWT
+          Okta OIDC Discovery: https://dev-XXXXX.okta.com/oauth2/default
+                               /.well-known/openid-configuration
+          Expected claim shape: { "groups": ["Admin", "Developers"] }
+          ══════════════════════════════════════════════════════════════
+        -->
+        <choose>
+            <when condition="@(((string)context.Variables["tokenIssuer"]).Contains("okta.com"))">
+
+                <!-- Full RS256 signature + issuer + audience validation -->
+                <validate-jwt
+                    header-name="Authorization"
+                    failed-validation-httpcode="401"
+                    failed-validation-error-message="Unauthorized: Invalid or expired Okta token"
+                    require-scheme="Bearer">
+                    <!--
+                      Replace YOUR_OKTA_ORG with your actual Okta domain.
+                      APIM fetches JWKS from this discovery URL automatically.
+                    -->
+                    <openid-config url="https://dev-YOUR_OKTA_ORG.okta.com/oauth2/default/.well-known/openid-configuration" />
+                    <required-claims>
+                        <!-- Audience must match the custom API audience configured in Okta Auth Server -->
+                        <claim name="aud" match="any">
+                            <value>https://api.authmatrix.local</value>
+                        </claim>
+                    </required-claims>
+                </validate-jwt>
+
+                <set-variable name="idpSource" value="okta" />
+
+                <!--
+                  Okta Claim Normalization:
+                  Map Okta Group names → internal application role vocabulary.
+                  Uses a static lookup table. For production: externalise to
+                  APIM Named Values to avoid policy redeploys on group renames.
+                -->
+                <set-variable name="normalizedRoles"
+                    value="@{
+                        var jwt = context.Request.Headers
+                                    .GetValueOrDefault("Authorization", "").AsJwt();
+                        var groups = jwt?.Claims.GetValueOrDefault("groups",
+                                         new string[0]) ?? new string[0];
+
+                        // Okta Group Name → Internal Role mapping
+                        var roleMap = new Dictionary&lt;string, string&gt;(
+                            StringComparer.OrdinalIgnoreCase) {
+                            { "Admin",            "Admin"     },
+                            { "SecurityEngineers","Admin"     },
+                            { "Managers",         "Manager"   },
+                            { "Developers",       "Developer" },
+                            { "Auditors",         "Auditor"   }
+                        };
+
+                        var roles = groups
+                            .Where(g => roleMap.ContainsKey(g))
+                            .Select(g => roleMap[g])
+                            .Distinct();
+
+                        return string.Join(",", roles);
+                    }" />
+
+            </when>
+
+            <!--
+              ══════════════════════════════════════════════════════════════
+              STEP 3B — Validate Microsoft Entra ID-issued JWT
+              Entra OIDC Discovery: https://login.microsoftonline.com
+                                    /{tenantId}/v2.0/.well-known/openid-configuration
+              Expected claim shape: { "roles": ["Admin", "Developer"] }
+              ══════════════════════════════════════════════════════════════
+            -->
+            <when condition="@(((string)context.Variables["tokenIssuer"]).Contains("microsoftonline.com"))">
+
+                <!-- Full RS256 signature + issuer + audience validation -->
+                <validate-jwt
+                    header-name="Authorization"
+                    failed-validation-httpcode="401"
+                    failed-validation-error-message="Unauthorized: Invalid or expired Entra ID token"
+                    require-scheme="Bearer">
+                    <!--
+                      Replace YOUR_TENANT_ID with your Azure AD Tenant (Directory) ID.
+                    -->
+                    <openid-config url="https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0/.well-known/openid-configuration" />
+                    <required-claims>
+                        <!-- Audience must match the App Registration URI in Entra -->
+                        <claim name="aud" match="any">
+                            <value>api://authmatrix-app-client-id</value>
+                        </claim>
+                    </required-claims>
+                </validate-jwt>
+
+                <set-variable name="idpSource" value="entra" />
+
+                <!--
+                  Entra Claim Normalization:
+                  Entra App Roles already use the internal role vocabulary
+                  defined in the App Registration manifest. Minimal transformation needed.
+                  The roles[] claim is read directly and joined as a comma-separated string.
+                -->
+                <set-variable name="normalizedRoles"
+                    value="@{
+                        var jwt = context.Request.Headers
+                                    .GetValueOrDefault("Authorization", "").AsJwt();
+                        var roles = jwt?.Claims.GetValueOrDefault("roles",
+                                         new string[0]) ?? new string[0];
+                        return string.Join(",", roles);
+                    }" />
+
+            </when>
+
+            <!--
+              ══════════════════════════════════════════════════════════════
+              STEP 3C — Reject tokens from unknown/untrusted issuers
+              Zero Trust: Explicit allow-list of trusted issuers only.
+              ══════════════════════════════════════════════════════════════
+            -->
+            <otherwise>
+                <return-response>
+                    <set-status code="401" reason="Unauthorized" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>{"error":"Unauthorized","message":"Token issuer is not in the trusted identity provider allowlist."}</set-body>
+                </return-response>
+            </otherwise>
+        </choose>
+
+        <!--
+          ══════════════════════════════════════════════════════════════
+          STEP 4 & 5 — Inject normalized, verified identity headers
+          Backend microservices ONLY consume these headers.
+          Raw JWT is removed in Step 6.
+          ══════════════════════════════════════════════════════════════
+        -->
+
+        <!-- Subject: unique, stable user identifier from IdP -->
         <set-header name="X-User-Id" exists-action="override">
-            <value>@(context.Variables.GetValueOrDefault<string>("user-id"))</value>
+            <value>@(context.Request.Headers
+                         .GetValueOrDefault("Authorization", "")
+                         .AsJwt()?.Subject ?? "unknown")</value>
         </set-header>
-        <set-header name="X-User-Roles" exists-action="override">
-            <value>@(context.Variables.GetValueOrDefault<string>("user-roles"))</value>
+
+        <!-- Email: from token's email claim -->
+        <set-header name="X-User-Email" exists-action="override">
+            <value>@(context.Request.Headers
+                         .GetValueOrDefault("Authorization", "")
+                         .AsJwt()?.Claims
+                         .GetValueOrDefault("email", "unknown") ?? "unknown")</value>
         </set-header>
+
+        <!-- Normalized application roles — IdP-agnostic comma-separated string -->
+        <set-header name="X-App-Roles" exists-action="override">
+            <value>@((string)context.Variables["normalizedRoles"])</value>
+        </set-header>
+
+        <!-- IdP source tag — for audit logging and observability -->
+        <set-header name="X-Idp-Source" exists-action="override">
+            <value>@((string)context.Variables["idpSource"])</value>
+        </set-header>
+
+        <!-- Token expiry — allows backend to log session age -->
+        <set-header name="X-Token-Exp" exists-action="override">
+            <value>@{
+                var jwt = context.Request.Headers
+                              .GetValueOrDefault("Authorization", "").AsJwt();
+                var exp = jwt?.Claims.GetValueOrDefault("exp", "0");
+                return exp;
+            }</value>
+        </set-header>
+
+        <!--
+          ══════════════════════════════════════════════════════════════
+          STEP 6 — Remove raw Authorization header
+          Zero Trust "Assume Breach": backends NEVER receive raw tokens.
+          All trust is derived from verified gateway-injected headers.
+          ══════════════════════════════════════════════════════════════
+        -->
+        <set-header name="Authorization" exists-action="delete" />
+
+        <!--
+          ══════════════════════════════════════════════════════════════
+          RATE LIMITING — Role-Based Throttling at the Edge
+          Admin / Manager tier: 1,000 requests per minute
+          Default tier:           100 requests per minute
+          ══════════════════════════════════════════════════════════════
+        -->
+        <choose>
+            <when condition="@(((string)context.Variables["normalizedRoles"]).Contains("Admin") ||
+                               ((string)context.Variables["normalizedRoles"]).Contains("Manager"))">
+                <rate-limit-by-key
+                    calls="1000"
+                    renewal-period="60"
+                    counter-key="@((string)context.Variables["normalizedRoles"] + ":" +
+                                   context.Request.Headers.GetValueOrDefault("X-User-Id","anon"))" />
+            </when>
+            <otherwise>
+                <rate-limit-by-key
+                    calls="100"
+                    renewal-period="60"
+                    counter-key="@(context.Request.Headers.GetValueOrDefault("X-User-Id","anon"))" />
+            </otherwise>
+        </choose>
+
     </inbound>
+
     <backend>
         <base />
     </backend>
+
     <outbound>
         <base />
+        <!-- Remove any sensitive headers from responses -->
+        <set-header name="X-Powered-By" exists-action="delete" />
+        <set-header name="Server"        exists-action="delete" />
     </outbound>
+
     <on-error>
         <base />
+        <return-response>
+            <set-status code="@(context.Response.StatusCode)" reason="@(context.Response.StatusReason)" />
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/json</value>
+            </set-header>
+            <set-body>@{
+                return new JObject(
+                    new JProperty("error", context.LastError.Source),
+                    new JProperty("message", context.LastError.Reason)
+                ).ToString();
+            }</set-body>
+        </return-response>
     </on-error>
 </policies>
