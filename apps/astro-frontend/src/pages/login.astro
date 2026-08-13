@@ -1,0 +1,185 @@
+---
+import Layout from '../layouts/Layout.astro';
+const error = Astro.url.searchParams.get('error');
+---
+
+<Layout title="Sign In & Auth Simulator">
+  <div class="login-wrapper">
+    <div class="login-card">
+      <h2>🔐 AuthMatrix Sign In & Simulator</h2>
+      <p class="login-desc">Select an authentication method to simulate or connect with your enterprise IdP.</p>
+
+      {error && <div class="alert-error">{error}</div>}
+
+      <div class="section-title">Mode A: Local Role Simulator (Phase 1)</div>
+      <div class="role-grid">
+        <form method="POST" action="/api/auth/login">
+          <input type="hidden" name="role" value="Admin" />
+          <button type="submit" class="btn-role btn-admin">
+            <span class="role-title">👑 Login as Admin</span>
+            <span class="role-sub">Full access (all permissions)</span>
+          </button>
+        </form>
+
+        <form method="POST" action="/api/auth/login">
+          <input type="hidden" name="role" value="Manager" />
+          <button type="submit" class="btn-role btn-manager">
+            <span class="role-title">💼 Login as Manager</span>
+            <span class="role-sub">Read/write reports</span>
+          </button>
+        </form>
+
+        <form method="POST" action="/api/auth/login">
+          <input type="hidden" name="role" value="Developer" />
+          <button type="submit" class="btn-role btn-dev">
+            <span class="role-title">💻 Login as Developer</span>
+            <span class="role-sub">Read reports & execute jobs</span>
+          </button>
+        </form>
+
+        <form method="POST" action="/api/auth/login">
+          <input type="hidden" name="role" value="Auditor" />
+          <button type="submit" class="btn-role btn-auditor">
+            <span class="role-title">🔍 Login as Auditor</span>
+            <span class="role-sub">Read-only audit access</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="divider"><span>OR</span></div>
+
+      <div class="section-title">Mode B: Enterprise IdP Integration (Phase 2 & 3)</div>
+      <div class="idp-actions">
+        <button class="btn-idp btn-okta" onclick="alert('Configure OKTA_CLIENT_ID in .env to trigger live OIDC redirect!')">
+          <span>🔵 Sign in with Okta (OIDC)</span>
+        </button>
+
+        <button class="btn-idp btn-entra" onclick="alert('Configure ENTRA_CLIENT_ID in .env to trigger live Entra ID OIDC redirect!')">
+          <span>🔷 Sign in with Microsoft Entra ID</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .login-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 0;
+  }
+
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    padding: 2.5rem;
+    border-radius: 16px;
+    max-width: 580px;
+    width: 100%;
+  }
+
+  .login-card h2 {
+    font-size: 1.6rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .login-desc {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .alert-error {
+    background: rgba(248, 113, 113, 0.15);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+  }
+
+  .role-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn-role {
+    width: 100%;
+    background: #1e293b;
+    border: 1px solid var(--surface-border);
+    padding: 0.9rem;
+    border-radius: 10px;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .btn-role:hover {
+    background: #334155;
+    border-color: var(--primary);
+  }
+
+  .role-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .role-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+  }
+
+  .divider {
+    text-align: center;
+    border-bottom: 1px solid var(--surface-border);
+    line-height: 0.1em;
+    margin: 1.5rem 0;
+  }
+
+  .divider span {
+    background: var(--surface);
+    padding: 0 0.8rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .idp-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .btn-idp {
+    padding: 0.85rem;
+    border-radius: 10px;
+    border: 1px solid var(--surface-border);
+    background: #1e293b;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s;
+  }
+
+  .btn-idp:hover {
+    background: #334155;
+  }
+</style>

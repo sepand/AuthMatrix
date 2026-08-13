@@ -1,0 +1,248 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const user = Astro.locals.user;
+const rawToken = Astro.cookies.get('auth_token')?.value;
+---
+
+<Layout title="Identity Dashboard">
+  <div class="dashboard-header">
+    <h2>⚡ Identity & Access Control Dashboard</h2>
+    <p>Authenticated as <strong>{user?.name}</strong> ({user?.email})</p>
+  </div>
+
+  <div class="dash-grid">
+    <!-- Card 1: Active Claims & Roles -->
+    <div class="dash-card">
+      <h3>📜 Active Identity Claims</h3>
+      <div class="claims-box">
+        <p><strong>Subject (ID):</strong> <code>{user?.sub}</code></p>
+        <p><strong>Assigned Roles:</strong> <span class="role-badge">{user?.roles?.[0]}</span></p>
+        <p><strong>Issuer:</strong> <code>{user?.iss}</code></p>
+        <p><strong>Audience:</strong> <code>{user?.aud}</code></p>
+      </div>
+
+      <h4 class="sub-heading">Granted Permissions:</h4>
+      <div class="permission-tags">
+        {user?.permissions?.map((p: string) => (
+          <span class="perm-tag">{p}</span>
+        ))}
+      </div>
+    </div>
+
+    <!-- Card 2: Interactive API Resource Server Tester -->
+    <div class="dash-card">
+      <h3>🚀 Test API Token Validation</h3>
+      <p class="card-subtitle">Call the backend Resource Server API (port 4000) using your active Bearer token to test AuthZ checks.</p>
+
+      <div class="api-btn-group">
+        <button id="btn-test-reports" class="btn-api btn-blue">
+          GET /api/protected/reports <br/><small>(Requires read:reports)</small>
+        </button>
+
+        <button id="btn-test-users" class="btn-api btn-green">
+          POST /api/protected/users <br/><small>(Requires write:users)</small>
+        </button>
+
+        <button id="btn-test-audit" class="btn-api btn-red">
+          DELETE /api/protected/audit <br/><small>(Requires delete:audit / Admin)</small>
+        </button>
+      </div>
+
+      <div class="output-box">
+        <div class="output-header">Response Logs:</div>
+        <pre id="api-output">// Click an endpoint above to send Authorization header and test validation...</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raw Token Inspection -->
+  <div class="dash-card full-width">
+    <h3>🔍 Raw Bearer Token (JWT Inspection)</h3>
+    <pre class="jwt-raw">{rawToken}</pre>
+  </div>
+</Layout>
+
+<script is:inline define:vars={{ rawToken }}>
+  const outputEl = document.getElementById('api-output');
+
+  async function callApi(endpoint, method = 'GET') {
+    outputEl.textContent = `Sending ${method} request to http://localhost:4000${endpoint}...`;
+    
+    try {
+      const res = await fetch(`http://localhost:4000${endpoint}`, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${rawToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: method === 'POST' ? JSON.stringify({ name: 'New User', email: 'new@example.com' }) : undefined
+      });
+
+      const data = await res.json();
+      outputEl.textContent = `STATUS ${res.status} ${res.statusText}\n\n` + JSON.stringify(data, null, 2);
+    } catch (err) {
+      outputEl.textContent = `API SERVER ERROR: Is the API server running on port 4000?\n\nDetails: ${err.message}`;
+    }
+  }
+
+  document.getElementById('btn-test-reports').addEventListener('click', () => callApi('/api/protected/reports', 'GET'));
+  document.getElementById('btn-test-users').addEventListener('click', () => callApi('/api/protected/users', 'POST'));
+  document.getElementById('btn-test-audit').addEventListener('click', () => callApi('/api/protected/audit', 'DELETE'));
+</script>
+
+<style>
+  .dashboard-header {
+    margin-bottom: 2rem;
+  }
+
+  .dashboard-header h2 {
+    font-size: 2rem;
+  }
+
+  .dashboard-header p {
+    color: var(--text-muted);
+  }
+
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .dash-card {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    padding: 1.75rem;
+    border-radius: 14px;
+  }
+
+  .full-width {
+    grid-column: span 2;
+  }
+
+  .dash-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .card-subtitle {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .claims-box p {
+    margin-bottom: 0.6rem;
+    font-size: 0.95rem;
+  }
+
+  .claims-box code {
+    background: #1e293b;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-family: var(--font-code);
+    font-size: 0.85rem;
+    color: var(--primary);
+  }
+
+  .role-badge {
+    background: #f59e0b;
+    color: #000;
+    font-weight: 800;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+  }
+
+  .sub-heading {
+    margin-top: 1.2rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  .permission-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .perm-tag {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--primary);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    font-size: 0.8rem;
+    font-family: var(--font-code);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+  }
+
+  .api-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .btn-api {
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--surface-border);
+    color: var(--text);
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+  }
+
+  .btn-blue { background: #1e293b; border-left: 4px solid var(--primary); }
+  .btn-green { background: #1e293b; border-left: 4px solid var(--success); }
+  .btn-red { background: #1e293b; border-left: 4px solid var(--danger); }
+
+  .btn-api:hover { background: #334155; }
+
+  .output-box {
+    background: #090d16;
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .output-header {
+    background: #111827;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    border-bottom: 1px solid var(--surface-border);
+  }
+
+  #api-output {
+    padding: 0.8rem;
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+    color: #38bdf8;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .jwt-raw {
+    background: #090d16;
+    border: 1px solid var(--surface-border);
+    padding: 1rem;
+    border-radius: 8px;
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+    color: #f472b6;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+
+  @media (max-width: 768px) {
+    .dash-grid { grid-template-columns: 1fr; }
+    .full-width { grid-column: span 1; }
+  }
+</style>

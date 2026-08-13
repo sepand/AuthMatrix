@@ -1,0 +1,29 @@
+{
+  "name": "authmatrix",
+  "version": "1.0.0",
+  "description": "Enterprise Identity & Access Management Masterclass and Sandbox powered by Astro & Express",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace=apps/astro-frontend",
+    "dev:api": "npm run dev --workspace=apps/api-server",
+    "dev": "npm run dev:frontend",
+    "build": "npm run build --workspaces"
+  },
+  "keywords": [
+    "identity",
+    "iam",
+    "oidc",
+    "saml",
+    "oauth2",
+    "jwt",
+    "rbac",
+    "astro",
+    "okta",
+    "entra-id"
+  ],
+  "author": "Sepand",
+  "license": "MIT"
+}

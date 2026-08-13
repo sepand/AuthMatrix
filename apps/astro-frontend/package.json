@@ -1,0 +1,22 @@
+{
+  "name": "astro-frontend",
+  "version": "1.0.0",
+  "description": "AuthMatrix Astro SSR web frontend with OIDC/SAML login, middleware RBAC, and token inspector",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.1.2",
+    "astro": "^5.3.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.8",
+    "@types/node": "^22.13.4",
+    "typescript": "^5.7.3"
+  }
+}

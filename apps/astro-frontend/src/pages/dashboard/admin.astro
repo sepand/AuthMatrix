@@ -1,0 +1,73 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const user = Astro.locals.user;
+---
+
+<Layout title="Admin Zone">
+  <div class="admin-header">
+    <span class="admin-badge">👑 Admin Privileged Access Only</span>
+    <h2>AuthMatrix Administrative Command Center</h2>
+    <p>Astro Middleware successfully verified your <code>Admin</code> role claim before rendering this page.</p>
+  </div>
+
+  <div class="admin-grid">
+    <div class="card">
+      <h3>👥 Directory User Provisioning</h3>
+      <p>Configure automated SCIM 2.0 provisioning endpoints to sync users from Okta Preview or Entra ID.</p>
+    </div>
+
+    <div class="card">
+      <h3>📊 SIEM Auth Logs & Audit Stream</h3>
+      <p>Real-time audit stream capturing authentication events, authorization failures, and token issuances.</p>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .admin-header {
+    margin-bottom: 2.5rem;
+  }
+
+  .admin-badge {
+    background: #f59e0b;
+    color: #000;
+    font-weight: 800;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    display: inline-block;
+    margin-bottom: 0.75rem;
+  }
+
+  .admin-header h2 {
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .admin-header p {
+    color: var(--text-muted);
+  }
+
+  .admin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    padding: 2rem;
+    border-radius: 14px;
+  }
+
+  .card h3 {
+    margin-bottom: 0.75rem;
+  }
+
+  .card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+</style>
