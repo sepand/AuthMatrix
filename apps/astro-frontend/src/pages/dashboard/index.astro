@@ -1,106 +1,218 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-const user = Astro.locals.user;
-const rawToken = Astro.cookies.get('auth_token')?.value;
+const user     = Astro.locals.user;
+const rawToken = Astro.cookies.get('auth_token')?.value || '';
+
+// Decode JWT parts for the inspector panel (display only — not re-verified here)
+function decodeJwtParts(token: string) {
+  try {
+    const [h, p] = token.split('.');
+    const header  = JSON.parse(atob(h.replace(/-/g,'+').replace(/_/g,'/')));
+    const payload = JSON.parse(atob(p.replace(/-/g,'+').replace(/_/g,'/')));
+    return { header, payload };
+  } catch { return null; }
+}
+
+const decoded   = decodeJwtParts(rawToken);
+const idpSource = (user as any)?.idp || 'local';
+
+const idpLabel: Record<string, { name: string; color: string; icon: string }> = {
+  okta:  { name: 'Okta',           color: '#00b1e5', icon: '🔵' },
+  entra: { name: 'Microsoft Entra', color: '#0078d4', icon: '🔷' },
+  local: { name: 'Local Simulator', color: '#34d399', icon: '💻' },
+};
+const idp = idpLabel[idpSource] || idpLabel.local;
 ---
 
 <Layout title="Identity Dashboard">
-  <div class="dashboard-header">
-    <h2>⚡ Identity & Access Control Dashboard</h2>
-    <p>Authenticated as <strong>{user?.name}</strong> ({user?.email})</p>
+  <!-- Header -->
+  <div class="dash-header">
+    <div class="dash-title-row">
+      <h2>Identity Dashboard</h2>
+      <span class="idp-badge" style={`background:${idp.color}22; color:${idp.color}; border-color:${idp.color}44`}>
+        {idp.icon} {idp.name}
+      </span>
+    </div>
+    <p class="dash-subtitle">
+      Authenticated as <strong>{user?.name}</strong> · <code>{user?.email}</code>
+    </p>
   </div>
 
   <div class="dash-grid">
-    <!-- Card 1: Active Claims & Roles -->
+
+    <!-- Card 1: Identity Claims -->
     <div class="dash-card">
-      <h3>📜 Active Identity Claims</h3>
-      <div class="claims-box">
-        <p><strong>Subject (ID):</strong> <code>{user?.sub}</code></p>
-        <p><strong>Assigned Roles:</strong> <span class="role-badge">{user?.roles?.[0]}</span></p>
-        <p><strong>Issuer:</strong> <code>{user?.iss}</code></p>
-        <p><strong>Audience:</strong> <code>{user?.aud}</code></p>
+      <h3>📜 Identity Claims</h3>
+      <div class="claims-list">
+        <div class="claim-row">
+          <span class="claim-key">Subject (sub)</span>
+          <code class="claim-val">{user?.sub}</code>
+        </div>
+        <div class="claim-row">
+          <span class="claim-key">Email</span>
+          <code class="claim-val">{user?.email}</code>
+        </div>
+        <div class="claim-row">
+          <span class="claim-key">Issuer (iss)</span>
+          <code class="claim-val">{user?.iss}</code>
+        </div>
+        <div class="claim-row">
+          <span class="claim-key">Audience (aud)</span>
+          <code class="claim-val">{user?.aud}</code>
+        </div>
+        <div class="claim-row">
+          <span class="claim-key">Identity Provider</span>
+          <span class="idp-source-tag">{idp.icon} {idp.name}</span>
+        </div>
       </div>
 
-      <h4 class="sub-heading">Granted Permissions:</h4>
-      <div class="permission-tags">
-        {user?.permissions?.map((p: string) => (
-          <span class="perm-tag">{p}</span>
+      <div class="section-sub-header">Assigned Roles</div>
+      <div class="tag-list">
+        {(user?.roles as string[] || []).map((r: string) => (
+          <span class="tag tag-role">{r}</span>
+        ))}
+      </div>
+
+      <div class="section-sub-header">Granted Permissions</div>
+      <div class="tag-list">
+        {(user?.permissions as string[] || []).map((p: string) => (
+          <span class="tag tag-perm">{p}</span>
         ))}
       </div>
     </div>
 
-    <!-- Card 2: Interactive API Resource Server Tester -->
+    <!-- Card 2: Role-Based Page Access -->
     <div class="dash-card">
-      <h3>🚀 Test API Token Validation</h3>
-      <p class="card-subtitle">Call the backend Resource Server API (port 4000) using your active Bearer token to test AuthZ checks.</p>
+      <h3>🛡️ Role-Based Page Access</h3>
+      <p class="card-sub">Click each page to test your access. Green = allowed, blocked = 403.</p>
 
-      <div class="api-btn-group">
-        <button id="btn-test-reports" class="btn-api btn-blue">
-          GET /api/protected/reports <br/><small>(Requires read:reports)</small>
-        </button>
-
-        <button id="btn-test-users" class="btn-api btn-green">
-          POST /api/protected/users <br/><small>(Requires write:users)</small>
-        </button>
-
-        <button id="btn-test-audit" class="btn-api btn-red">
-          DELETE /api/protected/audit <br/><small>(Requires delete:audit / Admin)</small>
-        </button>
+      <div class="page-access-list">
+        <a href="/dashboard/reports" class="page-access-link">
+          <span class="page-icon">📊</span>
+          <span class="page-info">
+            <span class="page-name">Reports</span>
+            <span class="page-roles">Manager · Developer · Admin</span>
+          </span>
+          <span class="page-arrow">→</span>
+        </a>
+        <a href="/dashboard/audit" class="page-access-link">
+          <span class="page-icon">🔍</span>
+          <span class="page-info">
+            <span class="page-name">Audit Logs</span>
+            <span class="page-roles">Auditor · Admin</span>
+          </span>
+          <span class="page-arrow">→</span>
+        </a>
+        <a href="/dashboard/admin" class="page-access-link">
+          <span class="page-icon">👑</span>
+          <span class="page-info">
+            <span class="page-name">Admin Zone</span>
+            <span class="page-roles">Admin only</span>
+          </span>
+          <span class="page-arrow">→</span>
+        </a>
       </div>
 
+      <div class="section-sub-header" style="margin-top:1.2rem">API Endpoint Tester</div>
+      <p class="card-sub">Send requests to the Express API (port 4000) with your Bearer token.</p>
+      <div class="api-btns">
+        <button id="btn-me"      class="btn-api btn-blue">GET /api/protected/me</button>
+        <button id="btn-reports" class="btn-api btn-teal">GET /api/protected/reports</button>
+        <button id="btn-jobs"    class="btn-api btn-green">GET /api/protected/jobs</button>
+        <button id="btn-write-report" class="btn-api btn-yellow">POST /api/protected/reports</button>
+        <button id="btn-users"   class="btn-api btn-orange">POST /api/protected/users</button>
+        <button id="btn-audit-read"   class="btn-api btn-purple">GET /api/protected/audit</button>
+        <button id="btn-settings"     class="btn-api btn-orange">PUT /api/protected/settings</button>
+        <button id="btn-del-user"     class="btn-api btn-red">DELETE /api/protected/users/42</button>
+        <button id="btn-del-audit"    class="btn-api btn-red">DELETE /api/protected/audit</button>
+      </div>
       <div class="output-box">
-        <div class="output-header">Response Logs:</div>
-        <pre id="api-output">// Click an endpoint above to send Authorization header and test validation...</pre>
+        <div class="output-header">
+          <span>API Response</span>
+          <span id="output-status" class="output-status"></span>
+        </div>
+        <pre id="api-output">// Click an endpoint above to test authorization...</pre>
       </div>
     </div>
   </div>
 
-  <!-- Raw Token Inspection -->
+  <!-- JWT Inspector Panel (full width) -->
   <div class="dash-card full-width">
-    <h3>🔍 Raw Bearer Token (JWT Inspection)</h3>
-    <pre class="jwt-raw">{rawToken}</pre>
+    <h3>🔬 JWT Inspector</h3>
+    <p class="card-sub">Your session token decoded. The <strong>signature</strong> was verified server-side via RS256/HS256 on every request (Zero Trust: Verify Explicitly).</p>
+
+    <div class="jwt-inspector-grid">
+      <div>
+        <div class="jwt-section-label">HEADER</div>
+        <pre class="jwt-part jwt-header">{JSON.stringify(decoded?.header, null, 2)}</pre>
+      </div>
+      <div>
+        <div class="jwt-section-label">PAYLOAD (Claims)</div>
+        <pre class="jwt-part jwt-payload">{JSON.stringify(decoded?.payload, null, 2)}</pre>
+      </div>
+      <div>
+        <div class="jwt-section-label">RAW TOKEN</div>
+        <pre class="jwt-part jwt-raw">{rawToken}</pre>
+      </div>
+    </div>
+
+    <div class="jwt-tool-link">
+      <span>🔗 Inspect further at</span>
+      <a href="https://jwt.io" target="_blank">jwt.io</a>
+      <span>— paste the raw token above</span>
+    </div>
   </div>
 </Layout>
 
 <script is:inline define:vars={{ rawToken }}>
-  const outputEl = document.getElementById('api-output');
+  const output   = document.getElementById('api-output');
+  const statusEl = document.getElementById('output-status');
 
-  async function callApi(endpoint, method = 'GET') {
-    outputEl.textContent = `Sending ${method} request to http://localhost:4000${endpoint}...`;
-    
+  async function callApi(endpoint, method = 'GET', body = null) {
+    output.textContent = `⏳ Calling ${method} ${endpoint}...`;
+    statusEl.textContent = '';
+    statusEl.className = 'output-status';
+
     try {
-      const res = await fetch(`http://localhost:4000${endpoint}`, {
+      const opts = {
         method,
-        headers: {
-          'Authorization': `Bearer ${rawToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: method === 'POST' ? JSON.stringify({ name: 'New User', email: 'new@example.com' }) : undefined
-      });
-
+        headers: { 'Authorization': `Bearer ${rawToken}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      };
+      const res  = await fetch(`http://localhost:4000${endpoint}`, opts);
       const data = await res.json();
-      outputEl.textContent = `STATUS ${res.status} ${res.statusText}\n\n` + JSON.stringify(data, null, 2);
+
+      statusEl.textContent = `${res.status} ${res.statusText}`;
+      statusEl.className   = `output-status ${res.ok ? 'status-ok' : 'status-err'}`;
+      output.textContent   = JSON.stringify(data, null, 2);
     } catch (err) {
-      outputEl.textContent = `API SERVER ERROR: Is the API server running on port 4000?\n\nDetails: ${err.message}`;
+      statusEl.textContent = 'ERROR';
+      statusEl.className   = 'output-status status-err';
+      output.textContent   = `⚠️ Cannot reach API on port 4000.\nMake sure the API server is running:\n  npm run dev --workspace=apps/api-server\n\nDetails: ${err.message}`;
     }
   }
 
-  document.getElementById('btn-test-reports').addEventListener('click', () => callApi('/api/protected/reports', 'GET'));
-  document.getElementById('btn-test-users').addEventListener('click', () => callApi('/api/protected/users', 'POST'));
-  document.getElementById('btn-test-audit').addEventListener('click', () => callApi('/api/protected/audit', 'DELETE'));
+  document.getElementById('btn-me').onclick      = () => callApi('/api/protected/me');
+  document.getElementById('btn-reports').onclick = () => callApi('/api/protected/reports');
+  document.getElementById('btn-jobs').onclick    = () => callApi('/api/protected/jobs');
+  document.getElementById('btn-write-report').onclick = () => callApi('/api/protected/reports', 'POST', { title: 'Lab Test Report', content: 'Created via dashboard tester' });
+  document.getElementById('btn-users').onclick   = () => callApi('/api/protected/users', 'POST', { name: 'Lab User', email: 'lab@test.com', role: 'Developer' });
+  document.getElementById('btn-audit-read').onclick = () => callApi('/api/protected/audit');
+  document.getElementById('btn-settings').onclick   = () => callApi('/api/protected/settings', 'PUT', { theme: 'dark', mfaRequired: true });
+  document.getElementById('btn-del-user').onclick   = () => callApi('/api/protected/users/42', 'DELETE');
+  document.getElementById('btn-del-audit').onclick  = () => callApi('/api/protected/audit', 'DELETE');
 </script>
 
 <style>
-  .dashboard-header {
-    margin-bottom: 2rem;
-  }
+  .dash-header { margin-bottom: 2rem; }
+  .dash-title-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
+  .dash-title-row h2 { font-size: 2rem; font-weight: 800; }
+  .dash-subtitle { color: var(--text-muted); font-size: 0.9rem; }
+  .dash-subtitle code { color: var(--primary); font-family: var(--font-code); }
 
-  .dashboard-header h2 {
-    font-size: 2rem;
-  }
-
-  .dashboard-header p {
-    color: var(--text-muted);
+  .idp-badge {
+    font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.75rem;
+    border-radius: 999px; border: 1px solid; white-space: nowrap;
   }
 
   .dash-grid {
@@ -117,132 +229,72 @@ const rawToken = Astro.cookies.get('auth_token')?.value;
     border-radius: 14px;
   }
 
-  .full-width {
-    grid-column: span 2;
-  }
+  .dash-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+  .card-sub { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1rem; line-height: 1.5; }
+  .full-width { grid-column: span 2; }
 
-  .dash-card h3 {
-    font-size: 1.25rem;
-    margin-bottom: 1rem;
-  }
+  .claims-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.2rem; }
+  .claim-row { display: flex; align-items: flex-start; gap: 0.75rem; font-size: 0.85rem; }
+  .claim-key { color: var(--text-muted); min-width: 120px; flex-shrink: 0; font-size: 0.78rem; padding-top: 0.1rem; }
+  .claim-val { color: var(--primary); font-family: var(--font-code); font-size: 0.78rem; word-break: break-all; }
+  .idp-source-tag { font-size: 0.82rem; font-weight: 600; }
 
-  .card-subtitle {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    margin-bottom: 1rem;
-  }
+  .section-sub-header { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 1rem 0 0.5rem; }
 
-  .claims-box p {
-    margin-bottom: 0.6rem;
-    font-size: 0.95rem;
-  }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .tag { font-size: 0.72rem; font-family: var(--font-code); padding: 0.2rem 0.55rem; border-radius: 5px; }
+  .tag-role { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); font-weight: 700; }
+  .tag-perm { background: rgba(56,189,248,0.1);  color: var(--primary); border: 1px solid rgba(56,189,248,0.25); }
 
-  .claims-box code {
-    background: #1e293b;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-family: var(--font-code);
-    font-size: 0.85rem;
-    color: var(--primary);
+  .page-access-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .page-access-link {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.7rem 0.9rem; border-radius: 8px;
+    background: #0f1929; border: 1px solid var(--surface-border);
+    text-decoration: none; color: var(--text);
+    transition: background 0.2s, border-color 0.2s;
   }
+  .page-access-link:hover { background: #1a2739; border-color: var(--primary); }
+  .page-icon { font-size: 1.1rem; }
+  .page-info { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; }
+  .page-name  { font-weight: 700; font-size: 0.88rem; }
+  .page-roles { font-size: 0.72rem; color: var(--text-muted); }
+  .page-arrow { color: var(--text-muted); font-size: 0.9rem; }
 
-  .role-badge {
-    background: #f59e0b;
-    color: #000;
-    font-weight: 800;
-    font-size: 0.75rem;
-    padding: 0.2rem 0.6rem;
-    border-radius: 6px;
-    text-transform: uppercase;
-  }
-
-  .sub-heading {
-    margin-top: 1.2rem;
-    margin-bottom: 0.6rem;
-    font-size: 0.9rem;
-    color: var(--text-muted);
-  }
-
-  .permission-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .perm-tag {
-    background: rgba(56, 189, 248, 0.15);
-    color: var(--primary);
-    border: 1px solid rgba(56, 189, 248, 0.3);
-    font-size: 0.8rem;
-    font-family: var(--font-code);
-    padding: 0.25rem 0.6rem;
-    border-radius: 6px;
-  }
-
-  .api-btn-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    margin-bottom: 1.2rem;
-  }
-
+  .api-btns { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem; }
   .btn-api {
-    padding: 0.75rem;
-    border-radius: 8px;
-    border: 1px solid var(--surface-border);
-    color: var(--text);
-    font-weight: 700;
-    cursor: pointer;
-    text-align: left;
-    transition: background 0.2s;
+    padding: 0.55rem 0.85rem; border-radius: 6px; border: 1px solid var(--surface-border);
+    color: var(--text); font-weight: 600; font-size: 0.78rem; cursor: pointer; text-align: left;
+    font-family: var(--font-code); transition: background 0.15s;
   }
+  .btn-blue   { background: #0f1929; border-left: 3px solid #38bdf8; }
+  .btn-teal   { background: #0f1929; border-left: 3px solid #2dd4bf; }
+  .btn-green  { background: #0f1929; border-left: 3px solid #34d399; }
+  .btn-yellow { background: #0f1929; border-left: 3px solid #fbbf24; }
+  .btn-orange { background: #0f1929; border-left: 3px solid #fb923c; }
+  .btn-purple { background: #0f1929; border-left: 3px solid #a78bfa; }
+  .btn-red    { background: #0f1929; border-left: 3px solid #f87171; }
+  .btn-api:hover { background: #1a2739; }
 
-  .btn-blue { background: #1e293b; border-left: 4px solid var(--primary); }
-  .btn-green { background: #1e293b; border-left: 4px solid var(--success); }
-  .btn-red { background: #1e293b; border-left: 4px solid var(--danger); }
+  .output-box { background: #070c14; border: 1px solid var(--surface-border); border-radius: 8px; overflow: hidden; }
+  .output-header { background: #111827; padding: 0.4rem 0.75rem; font-size: 0.72rem; color: var(--text-muted); font-weight: 700; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; }
+  .output-status { font-family: var(--font-code); font-size: 0.72rem; }
+  .status-ok  { color: var(--success); }
+  .status-err { color: var(--danger); }
+  #api-output { padding: 0.75rem; font-family: var(--font-code); font-size: 0.75rem; color: #38bdf8; white-space: pre-wrap; max-height: 180px; overflow-y: auto; margin: 0; }
 
-  .btn-api:hover { background: #334155; }
+  .jwt-inspector-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .jwt-section-label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; }
+  .jwt-part { background: #070c14; border: 1px solid var(--surface-border); padding: 0.75rem; border-radius: 8px; font-family: var(--font-code); font-size: 0.72rem; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; margin: 0; }
+  .jwt-header  { color: #f472b6; }
+  .jwt-payload { color: #34d399; }
+  .jwt-raw     { color: #94a3b8; }
+  .jwt-tool-link { color: var(--text-muted); font-size: 0.82rem; display: flex; align-items: center; gap: 0.4rem; }
+  .jwt-tool-link a { color: var(--primary); }
 
-  .output-box {
-    background: #090d16;
-    border: 1px solid var(--surface-border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .output-header {
-    background: #111827;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-weight: 700;
-    border-bottom: 1px solid var(--surface-border);
-  }
-
-  #api-output {
-    padding: 0.8rem;
-    font-family: var(--font-code);
-    font-size: 0.8rem;
-    color: #38bdf8;
-    white-space: pre-wrap;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .jwt-raw {
-    background: #090d16;
-    border: 1px solid var(--surface-border);
-    padding: 1rem;
-    border-radius: 8px;
-    font-family: var(--font-code);
-    font-size: 0.8rem;
-    color: #f472b6;
-    word-break: break-all;
-    white-space: pre-wrap;
-  }
-
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     .dash-grid { grid-template-columns: 1fr; }
     .full-width { grid-column: span 1; }
+    .jwt-inspector-grid { grid-template-columns: 1fr; }
   }
 </style>

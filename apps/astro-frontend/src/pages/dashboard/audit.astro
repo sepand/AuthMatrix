@@ -1,0 +1,151 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const user     = Astro.locals.user;
+const rawToken = Astro.cookies.get('auth_token')?.value || '';
+---
+<Layout title="Audit Logs">
+  <div class="page-header">
+    <h2>🔍 Audit Logs</h2>
+    <p>Access granted for roles: <strong>Auditor · Admin</strong></p>
+    <p class="sub">Your role: <span class="role-tag">{(user?.roles as string[])?.[0]}</span></p>
+  </div>
+
+  <div class="content-grid">
+    <div class="dash-card span-2">
+      <div class="card-top-row">
+        <h3>Audit Event Log <span class="scope-tag">read:audit</span></h3>
+        <button class="btn-refresh" id="btn-load-audit">↻ Load Events</button>
+      </div>
+      <p class="card-sub">Read-only view of all authentication and authorization events. Only Auditors and Admins can access this.</p>
+      <div id="audit-list"><p class="placeholder">Click "Load Events" to fetch audit log from API...</p></div>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="dash-card danger-card">
+      <h3>🗑️ Purge Audit Log <span class="scope-tag danger-scope">delete:audit — Admin Only</span></h3>
+      <p class="card-sub">
+        <strong style="color:var(--danger)">⚠️ Destructive action.</strong> Only Admin roles have the <code>delete:audit</code> permission.
+        Auditors can read logs but cannot delete them (Least Privilege).
+      </p>
+      <button id="btn-delete-audit" class="btn-danger">DELETE /api/protected/audit</button>
+      <div class="output-box" id="delete-output-box" style="display:none">
+        <pre id="delete-output"></pre>
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <h3>🛡️ Zero Trust: Auditor vs Admin</h3>
+      <p class="card-sub">This page demonstrates <strong>Least Privilege</strong> at two layers:</p>
+      <table class="perm-table">
+        <thead>
+          <tr><th>Action</th><th>Auditor</th><th>Admin</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>View this page</td><td class="yes">✅</td><td class="yes">✅</td></tr>
+          <tr><td>Read audit log</td><td class="yes">✅</td><td class="yes">✅</td></tr>
+          <tr><td>Delete audit log</td><td class="no">❌ 403</td><td class="yes">✅</td></tr>
+        </tbody>
+      </table>
+      <p class="card-sub" style="margin-top:1rem">Try clicking "Purge Audit Log" as an Auditor — the API returns 403 even though the page loaded successfully. <strong>Both middleware and API enforce Least Privilege independently.</strong></p>
+    </div>
+  </div>
+</Layout>
+
+<script is:inline define:vars={{ rawToken }}>
+  async function loadAudit() {
+    const list = document.getElementById('audit-list');
+    list.innerHTML = '<p style="color:#9ca3af;font-size:0.85rem">⏳ Loading...</p>';
+    try {
+      const res  = await fetch('http://localhost:4000/api/protected/audit', {
+        headers: { 'Authorization': `Bearer ${rawToken}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        list.innerHTML = `<div class="error-msg">❌ ${data.message} (${res.status})</div>`;
+        return;
+      }
+      list.innerHTML = data.events.map(e => `
+        <div class="audit-row">
+          <span class="audit-time">${new Date(e.timestamp).toLocaleTimeString()}</span>
+          <span class="audit-level ${e.level.toLowerCase()}">${e.level}</span>
+          <span class="audit-msg">${e.action} — ${e.user}</span>
+          <span class="audit-result ${e.result.toLowerCase()}">${e.result}</span>
+        </div>
+      `).join('');
+    } catch (err) {
+      list.innerHTML = `<div class="error-msg">⚠️ API server not running on port 4000.<br>Run: <code>npm run dev --workspace=apps/api-server</code></div>`;
+    }
+  }
+
+  document.getElementById('btn-load-audit').onclick = loadAudit;
+
+  document.getElementById('btn-delete-audit').onclick = async () => {
+    const box = document.getElementById('delete-output-box');
+    const pre = document.getElementById('delete-output');
+    box.style.display = 'block';
+    pre.textContent = '⏳ Sending DELETE request...';
+    try {
+      const res  = await fetch('http://localhost:4000/api/protected/audit', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${rawToken}` }
+      });
+      const data = await res.json();
+      pre.textContent = `STATUS ${res.status}\n\n${JSON.stringify(data, null, 2)}`;
+      pre.style.color = res.ok ? '#f87171' : '#34d399'; // red if succeeded (dangerous!), green if blocked
+    } catch (err) {
+      pre.textContent = err.message;
+      pre.style.color = '#f87171';
+    }
+  };
+</script>
+
+<style>
+  .page-header { margin-bottom: 2rem; }
+  .page-header h2 { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.4rem; }
+  .page-header p { color: var(--text-muted); font-size: 0.9rem; }
+  .sub { margin-top: 0.4rem !important; }
+  .role-tag { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 5px; }
+  .scope-tag { font-size: 0.65rem; font-family: var(--font-code); padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.5rem; font-weight: 400; background: rgba(56,189,248,0.12); color: var(--primary); border: 1px solid rgba(56,189,248,0.25); }
+  .danger-scope { background: rgba(248,113,113,0.12); color: var(--danger); border-color: rgba(248,113,113,0.25); }
+
+  .content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .dash-card { background: var(--surface); border: 1px solid var(--surface-border); padding: 1.75rem; border-radius: 14px; }
+  .dash-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .card-sub { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1rem; line-height: 1.5; }
+  .span-2 { grid-column: span 2; }
+  .danger-card { border-color: rgba(248,113,113,0.25); }
+
+  .card-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+  .btn-refresh { background: #1a2739; border: 1px solid var(--surface-border); color: var(--primary); padding: 0.4rem 0.85rem; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+  .btn-refresh:hover { background: #243044; }
+
+  .placeholder { color: var(--text-muted); font-style: italic; font-size: 0.85rem; }
+  .error-msg { color: var(--danger); font-size: 0.85rem; line-height: 1.6; }
+  .error-msg code { font-family: var(--font-code); }
+
+  .audit-row { display: grid; grid-template-columns: 70px 60px 1fr 70px; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--surface-border); font-size: 0.8rem; }
+  .audit-time { color: var(--text-muted); font-family: var(--font-code); font-size: 0.72rem; }
+  .audit-level { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; padding: 0.1rem 0.35rem; border-radius: 3px; text-align: center; }
+  .audit-level.info    { background: rgba(56,189,248,0.15); color: var(--primary); }
+  .audit-level.warning { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .audit-level.error   { background: rgba(248,113,113,0.15); color: var(--danger); }
+  .audit-msg { color: var(--text); }
+  .audit-result { font-size: 0.7rem; font-weight: 700; text-align: right; }
+  .audit-result.success { color: var(--success); }
+  .audit-result.denied  { color: var(--danger); }
+
+  .btn-danger { background: rgba(248,113,113,0.1); border: 1px solid var(--danger); color: var(--danger); padding: 0.65rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; cursor: pointer; font-family: var(--font-code); transition: background 0.2s; width: 100%; }
+  .btn-danger:hover { background: rgba(248,113,113,0.2); }
+
+  .output-box { background: #070c14; border: 1px solid var(--surface-border); border-radius: 8px; margin-top: 0.75rem; }
+  .output-box pre { padding: 0.75rem; font-family: var(--font-code); font-size: 0.75rem; white-space: pre-wrap; margin: 0; max-height: 140px; overflow-y: auto; }
+
+  .perm-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .perm-table th { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--surface-border); color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 700; }
+  .perm-table td { padding: 0.5rem; border-bottom: 1px solid var(--surface-border); }
+  .yes { color: var(--success); font-weight: 700; }
+  .no  { color: var(--danger);  font-weight: 700; }
+
+  @media (max-width: 768px) { .content-grid { grid-template-columns: 1fr; } .span-2 { grid-column: span 1; } }
+</style>

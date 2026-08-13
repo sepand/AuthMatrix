@@ -1,63 +1,146 @@
 ---
 import Layout from '../layouts/Layout.astro';
+
 const error = Astro.url.searchParams.get('error');
+
+// Detect which IdPs are configured from environment variables
+// (Only readable server-side in Astro SSR — never exposed to client)
+const oktaConfigured  = !!(process.env.OKTA_ISSUER && process.env.OKTA_CLIENT_ID);
+const entraConfigured = !!(process.env.ENTRA_TENANT_ID && process.env.ENTRA_CLIENT_ID);
 ---
 
-<Layout title="Sign In & Auth Simulator">
+<Layout title="Sign In">
   <div class="login-wrapper">
     <div class="login-card">
-      <h2>🔐 AuthMatrix Sign In & Simulator</h2>
-      <p class="login-desc">Select an authentication method to simulate or connect with your enterprise IdP.</p>
 
-      {error && <div class="alert-error">{error}</div>}
+      <div class="login-header">
+        <div class="login-icon">🔐</div>
+        <h2>AuthMatrix Sign In</h2>
+        <p class="login-desc">Choose how you want to authenticate for this lab session.</p>
+      </div>
 
-      <div class="section-title">Mode A: Local Role Simulator (Phase 1)</div>
+      {error && <div class="alert-error" role="alert">⚠️ {error}</div>}
+
+      <!-- ── MODE A: LOCAL ROLE SIMULATOR ──────────────────────────────── -->
+      <div class="section-header">
+        <span class="section-badge local">Mode A</span>
+        <span class="section-title">Local Role Simulator</span>
+        <span class="section-sub">Lab 1 — No IdP required</span>
+      </div>
+      <p class="section-desc">Instantly simulate any role to test RBAC and API authorization locally. No IdP setup needed.</p>
+
       <div class="role-grid">
         <form method="POST" action="/api/auth/login">
           <input type="hidden" name="role" value="Admin" />
-          <button type="submit" class="btn-role btn-admin">
-            <span class="role-title">👑 Login as Admin</span>
-            <span class="role-sub">Full access (all permissions)</span>
+          <button type="submit" class="btn-role" id="btn-login-admin">
+            <span class="role-icon">👑</span>
+            <span class="role-info">
+              <span class="role-name">Admin</span>
+              <span class="role-perms">All permissions</span>
+            </span>
           </button>
         </form>
 
         <form method="POST" action="/api/auth/login">
           <input type="hidden" name="role" value="Manager" />
-          <button type="submit" class="btn-role btn-manager">
-            <span class="role-title">💼 Login as Manager</span>
-            <span class="role-sub">Read/write reports</span>
+          <button type="submit" class="btn-role" id="btn-login-manager">
+            <span class="role-icon">💼</span>
+            <span class="role-info">
+              <span class="role-name">Manager</span>
+              <span class="role-perms">Reports + Users (read)</span>
+            </span>
           </button>
         </form>
 
         <form method="POST" action="/api/auth/login">
           <input type="hidden" name="role" value="Developer" />
-          <button type="submit" class="btn-role btn-dev">
-            <span class="role-title">💻 Login as Developer</span>
-            <span class="role-sub">Read reports & execute jobs</span>
+          <button type="submit" class="btn-role" id="btn-login-developer">
+            <span class="role-icon">💻</span>
+            <span class="role-info">
+              <span class="role-name">Developer</span>
+              <span class="role-perms">Reports + Execute jobs</span>
+            </span>
           </button>
         </form>
 
         <form method="POST" action="/api/auth/login">
           <input type="hidden" name="role" value="Auditor" />
-          <button type="submit" class="btn-role btn-auditor">
-            <span class="role-title">🔍 Login as Auditor</span>
-            <span class="role-sub">Read-only audit access</span>
+          <button type="submit" class="btn-role" id="btn-login-auditor">
+            <span class="role-icon">🔍</span>
+            <span class="role-info">
+              <span class="role-name">Auditor</span>
+              <span class="role-perms">Audit logs (read-only)</span>
+            </span>
           </button>
         </form>
       </div>
 
       <div class="divider"><span>OR</span></div>
 
-      <div class="section-title">Mode B: Enterprise IdP Integration (Phase 2 & 3)</div>
-      <div class="idp-actions">
-        <button class="btn-idp btn-okta" onclick="alert('Configure OKTA_CLIENT_ID in .env to trigger live OIDC redirect!')">
-          <span>🔵 Sign in with Okta (OIDC)</span>
-        </button>
-
-        <button class="btn-idp btn-entra" onclick="alert('Configure ENTRA_CLIENT_ID in .env to trigger live Entra ID OIDC redirect!')">
-          <span>🔷 Sign in with Microsoft Entra ID</span>
-        </button>
+      <!-- ── MODE B: ENTERPRISE IDP OIDC ───────────────────────────────── -->
+      <div class="section-header">
+        <span class="section-badge idp">Mode B</span>
+        <span class="section-title">Enterprise IdP — OIDC</span>
+        <span class="section-sub">Labs 2 & 3 — Real identity providers</span>
       </div>
+      <p class="section-desc">Sign in with your real Okta or Entra tenant. Configure <code>.env</code> first.</p>
+
+      <div class="idp-actions">
+        <!-- Okta OIDC Button -->
+        {oktaConfigured ? (
+          <a href="/api/auth/okta-login" class="btn-idp btn-okta" id="btn-okta-login">
+            <svg class="idp-logo" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm0 18c-3.314 0-6-2.686-6-6s2.686-6 6-6 6 2.686 6 6-2.686 6-6 6z"/>
+            </svg>
+            <span class="idp-label">
+              <span class="idp-name">Sign in with Okta</span>
+              <span class="idp-status configured">✅ Configured</span>
+            </span>
+          </a>
+        ) : (
+          <div class="btn-idp btn-okta btn-idp-disabled" title="Set OKTA_ISSUER and OKTA_CLIENT_ID in .env">
+            <svg class="idp-logo" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm0 18c-3.314 0-6-2.686-6-6s2.686-6 6-6 6 2.686 6 6-2.686 6-6 6z"/>
+            </svg>
+            <span class="idp-label">
+              <span class="idp-name">Sign in with Okta</span>
+              <span class="idp-status not-configured">⚠️ Set OKTA_ISSUER + OKTA_CLIENT_ID in .env</span>
+            </span>
+          </div>
+        )}
+
+        <!-- Entra OIDC Button -->
+        {entraConfigured ? (
+          <a href="/api/auth/entra-login" class="btn-idp btn-entra" id="btn-entra-login">
+            <svg class="idp-logo" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.5 0L0 6.5v11L11.5 24 23 17.5v-11L11.5 0zm0 2.3l9.2 5.3v10.8l-9.2 5.3-9.2-5.3V7.6l9.2-5.3z"/>
+            </svg>
+            <span class="idp-label">
+              <span class="idp-name">Sign in with Microsoft Entra ID</span>
+              <span class="idp-status configured">✅ Configured</span>
+            </span>
+          </a>
+        ) : (
+          <div class="btn-idp btn-entra btn-idp-disabled" title="Set ENTRA_TENANT_ID and ENTRA_CLIENT_ID in .env">
+            <svg class="idp-logo" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.5 0L0 6.5v11L11.5 24 23 17.5v-11L11.5 0zm0 2.3l9.2 5.3v10.8l-9.2 5.3-9.2-5.3V7.6l9.2-5.3z"/>
+            </svg>
+            <span class="idp-label">
+              <span class="idp-name">Sign in with Microsoft Entra ID</span>
+              <span class="idp-status not-configured">⚠️ Set ENTRA_TENANT_ID + ENTRA_CLIENT_ID in .env</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      <!-- Quick setup hint when IdPs are not yet configured -->
+      {(!oktaConfigured || !entraConfigured) && (
+        <div class="setup-hint">
+          <strong>📋 Setup Required:</strong> Copy <code>.env.example</code> → <code>.env</code> and fill in your IdP credentials.
+          See <a href="https://github.com/sepand/AuthMatrix/blob/main/docs/00-tenant-setup-guide.md" target="_blank">Tenant Setup Guide</a> for step-by-step instructions.
+        </div>
+      )}
+
     </div>
   </div>
 </Layout>
@@ -66,8 +149,8 @@ const error = Astro.url.searchParams.get('error');
   .login-wrapper {
     display: flex;
     justify-content: center;
-    align-items: center;
-    padding: 2rem 0;
+    align-items: flex-start;
+    padding: 2rem 0 4rem;
   }
 
   .login-card {
@@ -75,111 +158,231 @@ const error = Astro.url.searchParams.get('error');
     border: 1px solid var(--surface-border);
     padding: 2.5rem;
     border-radius: 16px;
-    max-width: 580px;
+    max-width: 560px;
     width: 100%;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
   }
 
-  .login-card h2 {
-    font-size: 1.6rem;
-    margin-bottom: 0.5rem;
+  .login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .login-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+  .login-header h2 {
+    font-size: 1.7rem;
+    font-weight: 800;
+    margin-bottom: 0.4rem;
   }
 
   .login-desc {
     color: var(--text-muted);
-    font-size: 0.95rem;
-    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
   }
 
   .alert-error {
-    background: rgba(248, 113, 113, 0.15);
+    background: rgba(248,113,113,0.12);
     border: 1px solid var(--danger);
     color: var(--danger);
     padding: 0.75rem 1rem;
     border-radius: 8px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     margin-bottom: 1.5rem;
   }
 
-  .section-title {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--primary);
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .section-badge {
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+  }
+
+  .section-badge.local { background: rgba(52,211,153,0.15); color: var(--success); border: 1px solid rgba(52,211,153,0.3); }
+  .section-badge.idp   { background: rgba(56,189,248,0.15); color: var(--primary); border: 1px solid rgba(56,189,248,0.3); }
+
+  .section-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .section-sub {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin-left: auto;
+  }
+
+  .section-desc {
+    color: var(--text-muted);
+    font-size: 0.85rem;
     margin-bottom: 1rem;
   }
 
   .role-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-bottom: 1.5rem;
   }
 
+  .role-grid form { display: contents; }
+
   .btn-role {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
     width: 100%;
-    background: #1e293b;
+    background: #1a2332;
     border: 1px solid var(--surface-border);
-    padding: 0.9rem;
+    padding: 0.85rem 1rem;
     border-radius: 10px;
     color: var(--text);
     cursor: pointer;
     text-align: left;
-    display: flex;
-    flex-direction: column;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background 0.2s, border-color 0.2s, transform 0.1s;
   }
 
   .btn-role:hover {
-    background: #334155;
+    background: #243044;
     border-color: var(--primary);
+    transform: translateY(-1px);
   }
 
-  .role-title {
+  .role-icon { font-size: 1.4rem; }
+
+  .role-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .role-name {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
   }
 
-  .role-sub {
-    font-size: 0.75rem;
+  .role-perms {
+    font-size: 0.72rem;
     color: var(--text-muted);
-    margin-top: 0.2rem;
   }
 
   .divider {
-    text-align: center;
-    border-bottom: 1px solid var(--surface-border);
-    line-height: 0.1em;
-    margin: 1.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.25rem 0;
+  }
+
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--surface-border);
   }
 
   .divider span {
-    background: var(--surface);
-    padding: 0 0.8rem;
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
   }
 
   .idp-actions {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    margin-bottom: 1rem;
   }
 
   .btn-idp {
-    padding: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.9rem 1.1rem;
     border-radius: 10px;
     border: 1px solid var(--surface-border);
-    background: #1e293b;
+    background: #1a2332;
     color: var(--text);
-    font-weight: 700;
-    font-size: 0.95rem;
+    font-weight: 600;
+    font-size: 0.9rem;
     cursor: pointer;
-    text-align: center;
-    transition: background 0.2s;
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s, transform 0.1s;
   }
 
-  .btn-idp:hover {
-    background: #334155;
+  .btn-idp:hover:not(.btn-idp-disabled) {
+    background: #243044;
+    border-color: var(--primary);
+    transform: translateY(-1px);
+  }
+
+  .btn-idp-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .idp-logo {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    opacity: 0.8;
+  }
+
+  .btn-okta  .idp-logo { color: #00b1e5; }
+  .btn-entra .idp-logo { color: #0078d4; }
+
+  .idp-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .idp-name { font-weight: 700; font-size: 0.88rem; }
+
+  .idp-status {
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  .idp-status.configured     { color: var(--success); }
+  .idp-status.not-configured { color: #f59e0b; }
+
+  .setup-hint {
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.25);
+    color: #fbbf24;
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    margin-top: 0.5rem;
+    line-height: 1.5;
+  }
+
+  .setup-hint code {
+    background: rgba(0,0,0,0.3);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+  }
+
+  .setup-hint a {
+    color: var(--primary);
+    text-decoration: underline;
+  }
+
+  @media (max-width: 480px) {
+    .role-grid { grid-template-columns: 1fr; }
+    .login-card { padding: 1.5rem; }
   }
 </style>
