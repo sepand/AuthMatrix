@@ -1,6 +1,6 @@
 # 📖 Phase 2: OpenID Connect (OIDC) & OAuth 2.0 Deep Dive
 
-Welcome to Phase 2 of **AuthMatrix**. This guide covers the mechanics of OpenID Connect (OIDC) and OAuth 2.0, detailing how to implement the Authorization Code Flow with PKCE in Astro and integrate with **Okta** and **Microsoft Entra ID**.
+> 🛡️ **Zero Trust Lens:** OIDC and OAuth 2.0 are the backbone of Zero Trust identity. They enable **Verify Explicitly** at every step — short-lived access tokens, audience-scoped permissions, PKCE anti-replay protection, and dynamic JWKS-based key rotation. No network location is trusted; only cryptographically verified tokens grant access.
 
 ---
 
@@ -16,6 +16,9 @@ Welcome to Phase 2 of **AuthMatrix**. This guide covers the mechanics of OpenID 
 ---
 
 ## 2. Authorization Code Flow with PKCE (Proof Key for Code Exchange)
+
+> [!IMPORTANT]
+> **Zero Trust Requirement:** Always use Authorization Code Flow with PKCE — never Implicit Flow. PKCE ensures that even if the authorization code is intercepted in transit, it cannot be exchanged for tokens without the matching `code_verifier`.
 
 PKCE (pronounced *"pixie"*) prevents authorization code injection and interception attacks on public clients (Single Page Apps, Mobile, SSR web apps).
 
@@ -59,7 +62,16 @@ sequenceDiagram
 
 ---
 
-## 4. Token Payload Structure Comparison
+## 4. Token Payload Structure & Zero Trust Validation Requirements
+
+> [!IMPORTANT]
+> **Zero Trust Checklist** — every Resource Server MUST verify all of the following on every request:
+> - ✅ `iss` (Issuer) matches your exact IdP URL
+> - ✅ `aud` (Audience) matches your specific API identifier
+> - ✅ `exp` (Expiration) is in the future
+> - ✅ `nbf` (Not Before) has passed
+> - ✅ Signature verified via JWKS (never accept `alg: none`)
+> - ✅ Required `scp` / `roles` / `permissions` claims are present
 
 ### ID Token (`id_token`) Payload
 ```json

@@ -1,6 +1,6 @@
 # 📖 Phase 3: SAML 2.0 Enterprise Single Sign-On (SSO)
 
-Welcome to Phase 3 of **AuthMatrix**. Security Assertion Markup Language (SAML 2.0) is the foundational standard for enterprise Single Sign-On (SSO) used across legacy corporate IT, federation proxies, and cloud identity management.
+> 🛡️ **Zero Trust Lens:** SAML 2.0 is the enterprise SSO backbone for legacy applications. Zero Trust requires validating **every XML digital signature**, explicitly checking the `InResponseTo` field to prevent replay attacks, and never trusting IdP-initiated requests without RelayState validation. The signature is the trust anchor — verify it cryptographically, always.
 
 ---
 
@@ -85,3 +85,11 @@ For complete click-by-click instructions on where to find and configure Attribut
 > **SAML Signature Wrapping (XSW)** occurs when an attacker manipulates the XML document structure to relocate a valid signature element away from modified assertion content, deceiving un-strict XML parsers into accepting tampered user IDs (`NameID`).
 >
 > **Mitigation:** Always validate that the signature specifically covers the `<saml2:Assertion>` element ID, not just the root document tag!
+
+> [!IMPORTANT]
+> **Zero Trust SAML Hardening Checklist:**
+> - ✅ Always validate the XML digital signature on every assertion
+> - ✅ Check `InResponseTo` matches your `AuthnRequest` ID (prevents replay attacks)
+> - ✅ Validate `NotBefore` and `NotOnOrAfter` conditions (prevents stale assertion replay)
+> - ✅ Validate `AudienceRestriction` matches your SP Entity ID
+> - ✅ For IdP-Initiated SSO: validate `RelayState` against a server-side allowlist to prevent open redirects

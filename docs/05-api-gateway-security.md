@@ -1,6 +1,6 @@
 # 📖 Phase 5: API Gateway Security & Token Injection (Azure APIM, Kong & MuleSoft)
 
-Welcome to Phase 5 of **AuthMatrix**. In enterprise architecture, an **API Gateway** serves as the central perimeter guard for your application ecosystem. Instead of forcing every microservice to independently parse JWTs and connect to IdP JWKS endpoints, the API Gateway centralizes token validation, enforces edge authorization, and transforms identity claims into standardized upstream HTTP headers.
+> 🛡️ **Zero Trust Lens:** The API Gateway is the **Zero Trust enforcement perimeter**. It embodies **Assume Breach** architecture — it strips all inbound `X-User-*` headers (attackers could inject them), validates every JWT cryptographically via JWKS, and only then injects verified identity claims into upstream headers. Backend microservices should *only* trust requests from the Gateway, enforced via mTLS or network policy.
 
 ---
 
@@ -131,10 +131,13 @@ In MuleSoft, API Manager applies out-of-the-box policies to RAML/OAS API specifi
 
 ---
 
-## 5. Summary: Security Architecture Best Practices
+## 5. Summary: Zero Trust API Gateway Security Checklist
 
-| Security Risk | Gateway Mitigation Strategy |
+| Security Risk | Zero Trust Gateway Mitigation |
 | :--- | :--- |
-| **Header Spoofing** | Always execute `<set-header name="X-User-*" exists-action="delete" />` **before** processing or injecting headers. |
-| **Excessive Microservice Load** | Cache IdP JWKS public keys at the Gateway layer (`jwksRequestsPerMinute: 10`, TTL: 24h). |
-| **Bypassing Gateway Edge** | Secure backend microservices so they only accept traffic originating from the API Gateway's internal IP / VNet or require mutual TLS (mTLS). |
+| **Header Spoofing** | ✅ Strip `X-User-*` headers **before** any processing. Inject them **after** JWKS verification only. |
+| **Excessive JWKS Load** | ✅ Cache IdP public keys at the Gateway (TTL: 1–24h). Rate-limit JWKS fetches per minute. |
+| **Bypassing Gateway Edge** | ✅ Backend services accept traffic **only** from the Gateway's internal VNet/IP. Enforce mTLS (mutual TLS) between Gateway and microservices. |
+| **Expired/Revoked Tokens** | ✅ Always check `exp` claim. For high-security endpoints, add token introspection against IdP. |
+| **Privilege Escalation** | ✅ Gateway verifies minimum required role/scope per route — not just token validity. |
+| **M2M Token Abuse** | ✅ M2M tokens use scoped Client Credentials. Never mix user tokens with service tokens at the API layer. |

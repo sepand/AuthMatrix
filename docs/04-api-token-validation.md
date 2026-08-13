@@ -1,6 +1,6 @@
 # 📖 Phase 4: API Security, JWKS & Token Validation (Resource Server Pattern)
 
-Welcome to Phase 4 of **AuthMatrix**. In modern cloud architecture, APIs and Microservices act as **Resource Servers**. They never prompt users for passwords; instead, they inspect, decode, and cryptographically verify Bearer tokens issued by Authorization Servers (Okta or Microsoft Entra ID).
+> 🛡️ **Zero Trust Lens:** Resource Servers are the enforcement point of Zero Trust. They **never trust** a request without first cryptographically verifying the Bearer token. They fetch public keys dynamically from JWKS endpoints — never hardcode secrets. Every endpoint enforces least-privilege scope checks. This is **Assume Breach** architecture: even tokens from internal services are validated.
 
 ---
 
@@ -16,18 +16,24 @@ Welcome to Phase 4 of **AuthMatrix**. In modern cloud architecture, APIs and Mic
 
 ---
 
-## 2. Token Validation Step-by-Step Checklist
+## 2. Token Validation Step-by-Step Checklist (Zero Trust Standard)
+
+> [!IMPORTANT]
+> **Zero Trust Mandate:** Every secure Resource Server MUST execute ALL of the following checks before granting access. Skipping any step — especially issuer or audience validation — creates a security gap that attackers can exploit.
 
 Every secure Resource Server API MUST execute the following checks before granting access:
 
 1. **Header Extraction:** Extract `Authorization: Bearer <TOKEN>` header. Reject missing or malformed headers with `401 Unauthorized`.
-2. **Algorithm Check:** Ensure `header.alg` is `RS256` or `ES256`. **Never allow `alg: none`!**
+2. **Algorithm Check:** Ensure `header.alg` is `RS256` or `ES256`. **Never allow `alg: none`!** (This disables all cryptographic verification.)
 3. **Key ID (`kid`) Lookup:** Extract `header.kid` and retrieve the matching public key from the IdP's JWKS endpoint (`/.well-known/jwks.json`).
-4. **Signature Verification:** Use the public key to verify the cryptographic signature.
-5. **Issuer (`iss`) Validation:** Assert that `payload.iss` exactly matches your expected IdP issuer URL (e.g. `https://dev-123456.okta.com/oauth2/default` or `https://login.microsoftonline.com/TENANT_ID/v2.0`).
-6. **Audience (`aud`) Validation:** Assert that `payload.aud` matches your API's targeted audience identifier (e.g. `https://api.authmatrix.local`).
-7. **Expiration (`exp`) & Not-Before (`nbf`) Checks:** Reject expired tokens (`exp < currentTime`).
-8. **Scope / Role Authorization:** Assert that `payload.scp` or `payload.groups`/`payload.roles` contain the required permissions for the endpoint.
+4. **Signature Verification:** Use the public key to verify the cryptographic signature. Any signature failure = immediate `401`.
+5. **Issuer (`iss`) Validation:** Assert that `payload.iss` exactly matches your expected IdP issuer URL.
+6. **Audience (`aud`) Validation:** Assert that `payload.aud` matches your API's audience identifier. Without this, tokens intended for Service A are accepted by Service B.
+7. **Expiration (`exp`) & Not-Before (`nbf`) Checks:** Reject expired tokens. Clock skew tolerance must not exceed 5 minutes.
+8. **Scope / Role Authorization:** Assert that `payload.scp` or `payload.roles` contain the required permission for the specific endpoint.
+
+> [!WARNING]
+> **JWKS Caching:** Cache IdP public keys locally (TTL: 1–24 hours) but always refresh when a new `kid` is encountered. Never hardcode public keys — IdPs rotate them.
 
 ---
 
