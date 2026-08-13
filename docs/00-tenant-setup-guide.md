@@ -99,9 +99,32 @@ Welcome to Phase 0 of **AuthMatrix**. This guide provides click-by-click, detail
 ---
 
 ### F. Exporting Okta SAML Certificates & Metadata
-1. On the **Sign On** tab, scroll down to the **SAML Setup** box on the right.
-2. Click **View SAML setup instructions** (or click **Metadata Details** to copy the Metadata URL / Certificate).
-3. Copy the **Identity Provider Single Sign-On URL** and **X.509 Certificate** into your `.env` file (`OKTA_SAML_ENTRY_POINT`, `OKTA_SAML_CERT`).
+
+1. On your app page, click the **Sign On** tab.
+2. Scroll down to the **SAML Setup** box on the right.
+3. Click **View SAML setup instructions** (or click **Metadata Details**).
+4. Copy the following 3 parameters into your `.env` file:
+   * **Identity Provider Single Sign-On URL:** Paste into `OKTA_SAML_ENTRY_POINT`
+   * **Identity Provider Issuer:** (e.g. `http://www.okta.com/exk123456789`) $\rightarrow$ Paste into `OKTA_SAML_ISSUER`
+   * **X.509 Certificate:** Copy the PEM certificate block $\rightarrow$ Paste into `OKTA_SAML_CERT`
+
+> [!IMPORTANT]
+> **How to Format Multiline X.509 Certificates in `.env` Files:**
+> Standard `.env` parsers (`dotenv`) break if a single variable spans multiple unquoted lines. To format your X.509 certificate correctly in `.env`:
+>
+> **Option A (Recommended - Escaped Newlines in Double Quotes):**  
+> Wrap the entire certificate in double quotes (`"..."`) and replace every line break with `\n`:
+> ```env
+> OKTA_SAML_CERT="-----BEGIN CERTIFICATE-----\nMIIDpDCCAoygAwIBAgIGAZ/5ZxucMA0GCSqGSIb3DQEBCwUAMIGSMQswCQYDVQQGEwJV...\n-----END CERTIFICATE-----"
+> ```
+>
+> **Option B (Multiline Double Quotes):**  
+> Keep the exact multiline block, but wrap the entire value inside double quotes (`"..."`):
+> ```env
+> OKTA_SAML_CERT="-----BEGIN CERTIFICATE-----
+> MIIDpDCCAoygAwIBAgIGAZ/5ZxucMA0GCSqGSIb3DQEBCwUAMIGSMQswCQYDVQQGEwJV...
+> -----END CERTIFICATE-----"
+> ```
 
 ---
 
@@ -182,6 +205,9 @@ Welcome to Phase 0 of **AuthMatrix**. This guide provides click-by-click, detail
 | `OKTA_ISSUER` | Okta Default Auth Server Issuer | Security $\rightarrow$ API $\rightarrow$ Authorization Servers | `https://dev-12345678.okta.com/oauth2/default` |
 | `OKTA_CLIENT_ID` | Okta OIDC Client ID | Applications $\rightarrow$ General tab | `0oaxxxxxxxxxx357` |
 | `OKTA_CLIENT_SECRET` | Okta OIDC Client Secret | Applications $\rightarrow$ General tab | `secret_key_12345` |
+| `OKTA_SAML_ENTRY_POINT` | Okta SAML SSO Entry Point URL | Applications $\rightarrow$ SAML App $\rightarrow$ Sign On tab $\rightarrow$ View Setup Instructions | `https://dev-12345678.okta.com/app/YOUR_APP_ID/sso/saml` |
+| `OKTA_SAML_ISSUER` | Okta SAML Identity Provider Issuer | Applications $\rightarrow$ SAML App $\rightarrow$ Sign On tab $\rightarrow$ View Setup Instructions | `http://www.okta.com/exk123456789` |
+| `OKTA_SAML_CERT` | Okta SAML X.509 Certificate | Applications $\rightarrow$ SAML App $\rightarrow$ Sign On tab $\rightarrow$ View Setup Instructions | `"-----BEGIN CERTIFICATE-----\nMIIDpD...\n-----END CERTIFICATE-----"` |
 | `ENTRA_TENANT_ID` | Entra Directory Tenant ID | App Registrations $\rightarrow$ Overview | `a1b2c3d4-e5f6-7890-abcd-1234567890ab` |
 | `ENTRA_CLIENT_ID` | Entra App Client ID | App Registrations $\rightarrow$ Overview | `f8765432-10ab-cdef-0123-456789abcdef` |
 | `ENTRA_CLIENT_SECRET` | Entra Client Secret Value | App Registrations $\rightarrow$ Certificates & Secrets | `secret_value_xyz` |
