@@ -80,31 +80,21 @@ Welcome to Phase 0 of **AuthMatrix**. This guide provides click-by-click, detail
 
 ### E. How to Configure Attribute Statements (Claims Mapping) in Okta
 
-*Okta features two UI layouts depending on your tenant version. Follow either **Path 1 (New UI)** or **Path 2 (Legacy UI)** below:*
+> [!IMPORTANT]
+> **Use "Show legacy configuration" to access Dropdown Menus:**
+> To avoid Okta Expression Language syntax errors, use Okta's built-in **Legacy Configuration** editor on the **Sign On** tab. This provides pre-populated dropdown menus for all user attributes.
 
-#### 🔹 Path 1: New Okta UI ("Add expression" Modal)
-1. On your app page, click the **Sign On** tab.
-2. Scroll down to the **Attribute statements** section.
-3. Click the blue **Add expression** button.
-4. In the **Add expression** modal popup, enter:
-   * **Name:** `email`
-   * **Expression:** `user.email`
-   * Click **Save**.
-5. Click **Add expression** again for each additional attribute:
-   * **Name:** `firstName` | **Expression:** `user.firstName` $\rightarrow$ click **Save**
-   * **Name:** `lastName` | **Expression:** `user.lastName` $\rightarrow$ click **Save**
-   * **Name:** `groups` | **Expression:** `user.getGroups()` $\rightarrow$ click **Save**
-
-#### 🔹 Path 2: Classic / Legacy Okta UI ("Show legacy configuration")
-1. On the **Sign On** tab, scroll down to the bottom and click **Show legacy configuration**.
-2. Click **Edit** on SAML 2.0 settings.
-3. Under **Attribute Statements (optional)**, enter:
-   * **Name:** `email` | **Name format:** `Unspecified` | **Value:** `user.email`
-   * **Name:** `firstName` | **Name format:** `Unspecified` | **Value:** `user.firstName`
-   * **Name:** `lastName` | **Name format:** `Unspecified` | **Value:** `user.lastName`
-4. Under **Group Attribute Statements (optional)**:
+#### 🔹 Step-by-Step Instructions (Dropdown Menus)
+1. On the **Sign On** tab, scroll down to the bottom of the page.
+2. Click the accordion titled **Show legacy configuration** (located below Attribute statements).
+3. Click **Edit** next to SAML 2.0 settings.
+4. Under **Attribute Statements (optional)**, map the attributes using the dropdown menus:
+   * **Name:** `email` | **Name format:** `Unspecified` | **Value:** Select `user.email` from the dropdown
+   * **Name:** `firstName` | **Name format:** `Unspecified` | **Value:** Select `user.firstName` from the dropdown
+   * **Name:** `lastName` | **Name format:** `Unspecified` | **Value:** Select `user.lastName` from the dropdown
+5. Under **Group Attribute Statements (optional)**:
    * **Name:** `groups` | **Name format:** `Unspecified` | **Filter:** `Matches regex` | **Value:** `.*`
-5. Click **Save**.
+6. Click **Save**.
 
 ---
 
