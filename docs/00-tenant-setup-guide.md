@@ -8,7 +8,7 @@ Welcome to Phase 0 of **AuthMatrix**. This guide provides step-by-step setup ins
 
 | Platform | Core Topic | Official Documentation Link |
 | :--- | :--- | :--- |
-| **Okta Developer** | OIDC & OAuth 2.0 Overview | [Okta OIDC & OAuth 2.0 API Docs](https://developer.okta.com/docs/concepts/oauth-oidc/) |
+| **Okta Developer** | OIDC & OAuth 2.0 Overview | [Okta OIDC & OAuth 2.0 API Docs](https://developer.okta.com/docs/concepts/oauth-openid/) |
 | **Okta Developer** | Authorization Servers | [Okta Custom Authorization Servers](https://developer.okta.com/docs/concepts/auth-servers/) |
 | **Okta Developer** | SAML 2.0 Web Apps | [Okta SAML Application Setup Guide](https://developer.okta.com/docs/guides/build-sso-integration/saml2/overview/) |
 | **Microsoft Entra** | App Registrations & OIDC | [Microsoft Entra ID App Registration Overview](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app) |
