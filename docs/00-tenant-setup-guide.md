@@ -19,10 +19,14 @@ Welcome to Phase 0 of **AuthMatrix**. This guide provides click-by-click, detail
 
 ## 1. Okta Developer Tenant Setup & Step-by-Step Configuration
 
-### A. Register Okta Developer Account
+### A. Register Okta Developer Account & Copy Org URL
 1. Navigate to [developer.okta.com/signup](https://developer.okta.com/signup/) and complete the registration form.
 2. Check your email for the activation link and initial admin password.
 3. Log into your Okta Admin Console (URL format: `https://dev-XXXXXX.okta.com/admin/dashboard`).
+4. **Where to find `OKTA_ORG_URL`:**
+   * Look at your browser's address bar or click your profile icon in the top-right corner.
+   * Copy the domain portion only (e.g. `https://dev-12345678.okta.com`). **Do NOT include `/admin/dashboard`**.
+   * Paste this into your `.env` file as `OKTA_ORG_URL`.
 
 ---
 
@@ -46,17 +50,23 @@ Welcome to Phase 0 of **AuthMatrix**. This guide provides click-by-click, detail
 
 ---
 
-### C. Configure Okta Groups Claim in Custom Authorization Server (Phase 2 & 4)
-*By default, Okta does NOT include group memberships in Access Tokens. You must configure a Custom Group Claim in your Default Authorization Server:*
-1. In the left navigation menu, go to **Security** $\rightarrow$ **API**.
-2. Under the **Authorization Servers** tab, click on **default** (or click the edit pencil icon).
-3. Go to the **Claims** tab.
-4. Click **Add Claim**:
-   * **Name:** `groups`
-   * **Include in token type:** Select **Access Token** $\rightarrow$ **Always**
-   * **Value type:** Select **Group filter**
-   * **Filter:** Select **Matches regex** from the dropdown, and type `.*` into the input box.
-5. Click **Create**. Now Okta access tokens will contain user group memberships (`roles`/`groups`) for RBAC testing!
+### C. Configure Okta Groups Claim & Copy Issuer URI (Phase 2 & 4)
+
+1. **Where to find `OKTA_ISSUER`:**
+   * In the left navigation menu, go to **Security** $\rightarrow$ **API**.
+   * On the **Authorization Servers** tab, look at the row for **default**.
+   * Copy the value in the **Issuer URI** column (e.g. `https://dev-12345678.okta.com/oauth2/default`).
+   * Paste this into your `.env` file as `OKTA_ISSUER`.
+2. **Configure Custom Group Claim (For RBAC):**
+   * *By default, Okta does NOT include group memberships in Access Tokens. You must configure a Custom Group Claim:*
+   * Click on **default** (or click the edit pencil icon next to default).
+   * Go to the **Claims** tab.
+   * Click **Add Claim**:
+     * **Name:** `groups`
+     * **Include in token type:** Select **Access Token** $\rightarrow$ **Always**
+     * **Value type:** Select **Group filter**
+     * **Filter:** Select **Matches regex** from the dropdown, and type `.*` into the input box.
+   * Click **Create**. Now Okta access tokens will contain user group memberships (`roles`/`groups`) for RBAC testing!
 
 ---
 
