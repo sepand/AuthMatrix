@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { requireAuth, requirePermission, AuthenticatedRequest } from './middleware/auth.js';
+import { apiGatewaySimulator } from './middleware/gatewaySimulator.js';
 
 dotenv.config();
 
@@ -90,6 +91,19 @@ app.delete('/api/protected/audit', requireAuth, requirePermission('delete:audit'
     message: 'CRITICAL: Audit log purged successfully',
     executedBy: req.user?.name,
     timestamp: new Date().toISOString()
+  });
+});
+
+// Protected Endpoint: API Gateway Simulator (Edge JWT validation & Header Injection)
+app.get('/api/gateway/protected-resource', apiGatewaySimulator, (req, res) => {
+  res.json({
+    message: 'Access granted via API Gateway Edge Perimeter Security!',
+    gatewayInjectedHeaders: {
+      'x-user-id': req.headers['x-user-id'],
+      'x-user-roles': req.headers['x-user-roles'],
+      'x-user-permissions': req.headers['x-user-permissions']
+    },
+    note: 'The API Gateway validated your JWT at the edge, stripped untrusted headers, and injected these verified claims for downstream microservices.'
   });
 });
 

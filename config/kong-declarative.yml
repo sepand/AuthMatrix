@@ -1,0 +1,27 @@
+# ⚡ AuthMatrix Kong API Gateway Declarative Configuration Template
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: authmatrix-backend-service
+    url: http://localhost:4000
+    routes:
+      - name: authmatrix-api-route
+        paths:
+          - /api
+    plugins:
+      - name: openid-connect
+        config:
+          issuer: https://login.microsoftonline.com/{{ENTRA_TENANT_ID}}/v2.0
+          auth_methods:
+            - bearer
+      - name: request-transformer
+        config:
+          remove:
+            headers:
+              - "X-User-Id"
+              - "X-User-Roles"
+          add:
+            headers:
+              - "X-User-Id:$(headers.authorization.claims.sub)"
+              - "X-User-Roles:$(headers.authorization.claims.roles)"
