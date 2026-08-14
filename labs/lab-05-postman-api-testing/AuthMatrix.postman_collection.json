@@ -1,0 +1,328 @@
+{
+  "info": {
+    "name": "AuthMatrix API Testing",
+    "_postman_id": "authmatrix-lab-collection-v1",
+    "description": "Complete Postman collection for testing all AuthMatrix API endpoints.\n\nThree authentication strategies:\n  1. LOCAL (Lab 1): POST /api/auth/mock-token → get instant JWT for any role, no IdP needed\n  2. OKTA (Lab 2): OAuth 2.0 Authorization Code + PKCE flow via Okta\n  3. ENTRA (Lab 3): OAuth 2.0 Authorization Code + PKCE flow via Microsoft Entra ID\n\nSee labs/lab-05-postman-api-testing/README.md for step-by-step instructions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "api_base",       "value": "http://localhost:4000",                  "type": "string" },
+    { "key": "token_admin",    "value": "PASTE_ADMIN_TOKEN_HERE",                 "type": "string" },
+    { "key": "token_manager",  "value": "PASTE_MANAGER_TOKEN_HERE",               "type": "string" },
+    { "key": "token_developer","value": "PASTE_DEVELOPER_TOKEN_HERE",             "type": "string" },
+    { "key": "token_auditor",  "value": "PASTE_AUDITOR_TOKEN_HERE",               "type": "string" },
+    { "key": "active_token",   "value": "{{token_admin}}",                        "type": "string" },
+    { "key": "okta_issuer",    "value": "https://dev-XXXXXX.okta.com/oauth2/default", "type": "string" },
+    { "key": "okta_client_id", "value": "PASTE_OKTA_CLIENT_ID",                  "type": "string" },
+    { "key": "entra_tenant_id","value": "PASTE_ENTRA_TENANT_ID",                 "type": "string" },
+    { "key": "entra_client_id","value": "PASTE_ENTRA_CLIENT_ID",                 "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "🔑 Step 0 — Get Mock Tokens (Local, No IdP)",
+      "description": "Run these four requests first to populate the collection variables with signed JWTs for each role. No IdP setup required.",
+      "item": [
+        {
+          "name": "Get Admin Token",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "var data = pm.response.json();",
+              "if (data.token) {",
+              "  pm.collectionVariables.set('token_admin', data.token);",
+              "  pm.collectionVariables.set('active_token', data.token);",
+              "  console.log('✅ Admin token saved. Permissions: ' + data.permissions.join(', '));",
+              "}"
+            ], "type": "text/javascript" }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"Admin\"\n}" },
+            "url": { "raw": "{{api_base}}/api/auth/mock-token", "host": ["{{api_base}}"], "path": ["api", "auth", "mock-token"] },
+            "description": "Returns a signed JWT with ALL permissions. The test script auto-saves it to the collection variable `token_admin`."
+          }
+        },
+        {
+          "name": "Get Manager Token",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "var data = pm.response.json();",
+              "if (data.token) {",
+              "  pm.collectionVariables.set('token_manager', data.token);",
+              "  console.log('✅ Manager token saved. Permissions: ' + data.permissions.join(', '));",
+              "}"
+            ], "type": "text/javascript" }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"Manager\"\n}" },
+            "url": { "raw": "{{api_base}}/api/auth/mock-token", "host": ["{{api_base}}"], "path": ["api", "auth", "mock-token"] }
+          }
+        },
+        {
+          "name": "Get Developer Token",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "var data = pm.response.json();",
+              "if (data.token) {",
+              "  pm.collectionVariables.set('token_developer', data.token);",
+              "  console.log('✅ Developer token saved. Permissions: ' + data.permissions.join(', '));",
+              "}"
+            ], "type": "text/javascript" }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"Developer\"\n}" },
+            "url": { "raw": "{{api_base}}/api/auth/mock-token", "host": ["{{api_base}}"], "path": ["api", "auth", "mock-token"] }
+          }
+        },
+        {
+          "name": "Get Auditor Token",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "var data = pm.response.json();",
+              "if (data.token) {",
+              "  pm.collectionVariables.set('token_auditor', data.token);",
+              "  console.log('✅ Auditor token saved. Permissions: ' + data.permissions.join(', '));",
+              "}"
+            ], "type": "text/javascript" }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"Auditor\"\n}" },
+            "url": { "raw": "{{api_base}}/api/auth/mock-token", "host": ["{{api_base}}"], "path": ["api", "auth", "mock-token"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🌐 Public Endpoint (No Auth)",
+      "item": [
+        {
+          "name": "GET /api/public",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{api_base}}/api/public", "host": ["{{api_base}}"], "path": ["api", "public"] },
+            "description": "No authentication required. Should return 200 for everyone."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "👤 Identity — Any Authenticated User",
+      "item": [
+        {
+          "name": "GET /api/protected/me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{active_token}}" }],
+            "url": { "raw": "{{api_base}}/api/protected/me", "host": ["{{api_base}}"], "path": ["api", "protected", "me"] },
+            "description": "Returns the decoded identity claims from your token. Works for ALL roles. Change `active_token` collection variable to switch roles."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📊 Reports (read:reports · write:reports)",
+      "item": [
+        {
+          "name": "GET /api/protected/reports — Admin ✅ Manager ✅ Developer ✅ Auditor ✅",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{active_token}}" }],
+            "url": { "raw": "{{api_base}}/api/protected/reports", "host": ["{{api_base}}"], "path": ["api", "protected", "reports"] },
+            "description": "Requires `read:reports`. All four roles have this permission."
+          }
+        },
+        {
+          "name": "POST /api/protected/reports — Admin ✅ Manager ✅ Developer ❌ Auditor ❌",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{active_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Test Report\",\n  \"content\": \"Created via Postman in Lab 5\"\n}"
+            },
+            "url": { "raw": "{{api_base}}/api/protected/reports", "host": ["{{api_base}}"], "path": ["api", "protected", "reports"] },
+            "description": "Requires `write:reports`. Switch to Developer or Auditor token → expect 403."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "👥 Users (read:users · write:users · delete:users)",
+      "item": [
+        {
+          "name": "GET /api/protected/users — Admin ✅ Manager ✅ Developer ✅ Auditor ❌",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{active_token}}" }],
+            "url": { "raw": "{{api_base}}/api/protected/users", "host": ["{{api_base}}"], "path": ["api", "protected", "users"] },
+            "description": "Requires `read:users`. Auditor lacks this permission → 403."
+          }
+        },
+        {
+          "name": "POST /api/protected/users — Admin ✅ Manager ❌ Developer ❌ Auditor ❌",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{active_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Test User\",\n  \"email\": \"postman@authmatrix.local\",\n  \"role\": \"Developer\"\n}"
+            },
+            "url": { "raw": "{{api_base}}/api/protected/users", "host": ["{{api_base}}"], "path": ["api", "protected", "users"] },
+            "description": "Requires `write:users`. Only Admin has this. Try with Manager token → 403."
+          }
+        },
+        {
+          "name": "DELETE /api/protected/users/:id — Admin ✅ All others ❌",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{active_token}}" }],
+            "url": { "raw": "{{api_base}}/api/protected/users/1", "host": ["{{api_base}}"], "path": ["api", "protected", "users", "1"] },
+            "description": "Requires `delete:users`. Admin only. Any other role → 403."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "⚙️ Jobs (execute:jobs)",
+      "item": [
+        {
+          "name": "GET /api/protected/jobs — Admin ✅ Manager ❌ Developer ✅ Auditor ❌",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{active_token}}" }],
+            "url": { "raw": "{{api_base}}/api/protected/jobs", "host": ["{{api_base}}"], "path": ["api", "protected", "jobs"] },
+            "description": "Requires `execute:jobs`. Interesting case — Manager CANNOT run jobs even though they outrank Developer on reports. Least Privilege."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔍 Audit Log (read:audit · delete:audit)",
+      "item": [
+        {
+          "name": "GET /api/protected/audit — Admin ✅ Manager ❌ Developer ❌ Auditor ✅",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{active_token}}" }],
+            "url": { "raw": "{{api_base}}/api/protected/audit", "host": ["{{api_base}}"], "path": ["api", "protected", "audit"] },
+            "description": "Requires `read:audit`. Auditor and Admin only. Manager and Developer → 403."
+          }
+        },
+        {
+          "name": "DELETE /api/protected/audit — Admin ✅ Auditor ❌ (cannot delete own logs!)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{active_token}}" }],
+            "url": { "raw": "{{api_base}}/api/protected/audit", "host": ["{{api_base}}"], "path": ["api", "protected", "audit"] },
+            "description": "Requires `delete:audit`. Admin only. IMPORTANT: Auditor can READ logs but CANNOT DELETE them — a core Least Privilege principle. This prevents auditors from covering their tracks."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔧 Settings (write:settings)",
+      "item": [
+        {
+          "name": "PUT /api/protected/settings — Admin ✅ All others ❌",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{active_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mfaRequired\": true,\n  \"sessionTimeoutMinutes\": 60,\n  \"allowedIpRanges\": [\"10.0.0.0/8\"]\n}"
+            },
+            "url": { "raw": "{{api_base}}/api/protected/settings", "host": ["{{api_base}}"], "path": ["api", "protected", "settings"] },
+            "description": "Requires `write:settings`. Admin only. All other roles → 403."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🚫 Attack Simulation — Token Tampering",
+      "description": "These requests demonstrate what happens when tokens are manipulated. Expected: all return 401 or 403.",
+      "item": [
+        {
+          "name": "No Token — Expect 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_base}}/api/protected/me", "host": ["{{api_base}}"], "path": ["api", "protected", "me"] },
+            "description": "No Authorization header. Should return 401 Unauthorized."
+          }
+        },
+        {
+          "name": "Invalid Token — Expect 401",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer this.is.invalid" }],
+            "url": { "raw": "{{api_base}}/api/protected/me", "host": ["{{api_base}}"], "path": ["api", "protected", "me"] },
+            "description": "Malformed JWT. Server rejects it immediately."
+          }
+        },
+        {
+          "name": "Expired Token Simulation — Expect 401",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0Iiwicm9sZXMiOlsiQWRtaW4iXSwiZXhwIjoxfQ.invalid_signature_expired" }],
+            "url": { "raw": "{{api_base}}/api/protected/me", "host": ["{{api_base}}"], "path": ["api", "protected", "me"] },
+            "description": "Token with exp=1 (year 1970). Server checks expiry and rejects. Simulates a stolen expired token replay attack."
+          }
+        },
+        {
+          "name": "Auditor Tries to Delete Audit Log — Expect 403",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_auditor}}" }],
+            "url": { "raw": "{{api_base}}/api/protected/audit", "host": ["{{api_base}}"], "path": ["api", "protected", "audit"] },
+            "description": "Auditor role has read:audit but NOT delete:audit. This request should return 403 — demonstrating that read access never implies write or delete access (Least Privilege)."
+          }
+        },
+        {
+          "name": "Developer Tries to Write Users — Expect 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_developer}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Injected User\",\n  \"email\": \"evil@attacker.com\",\n  \"role\": \"Admin\"\n}"
+            },
+            "url": { "raw": "{{api_base}}/api/protected/users", "host": ["{{api_base}}"], "path": ["api", "protected", "users"] },
+            "description": "Developer tries to provision a new Admin user. Should return 403 — write:users requires Admin role."
+          }
+        }
+      ]
+    }
+
+  ]
+}

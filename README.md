@@ -79,6 +79,7 @@ Each lab is fully self-contained with step-by-step instructions, expected result
 | **Lab 2** | [Okta OIDC Authentication](labs/lab-02-okta-oidc/README.md) | **Okta only** | ~45 min |
 | **Lab 3** | [Microsoft Entra ID OIDC Authentication](labs/lab-03-entra-oidc/README.md) | **Entra only** | ~45 min |
 | **Lab 4** | [Azure APIM API Gateway (Dual-IdP)](labs/lab-04-azure-apim/README.md) | Okta + Entra → APIM | ~90 min |
+| **Lab 5** | [API Testing with Postman](labs/lab-05-postman-api-testing/README.md) | All (local + Okta + Entra) | ~30 min |
 
 > **Labs 2 and 3 are completely independent** — complete either or both. They only converge in Lab 4, where Azure APIM acts as the single gateway for both IdPs.
 
