@@ -1,0 +1,215 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout
+  title="Labs"
+  description="AuthMatrix hands-on identity labs &mdash; configure Okta, Entra ID, Azure APIM, and test APIs with Postman step by step."
+  section="Labs"
+>
+  <div class="page-wrap">
+    <div class="labs-header">
+      <span class="badge badge-lab">Hands-On</span>
+      <h1>Identity Labs</h1>
+      <p class="lead">
+        Step-by-step labs for configuring real identity providers, API gateways, and testing tools.
+        Each lab builds on the previous. Start with Lab 1 &mdash; no cloud account required.
+      </p>
+    </div>
+
+    <!-- Prerequisites -->
+    <div class="prereq-box">
+      <h2>Before You Start</h2>
+      <div class="prereq-grid">
+        <div>
+          <h3>Required for all labs</h3>
+          <ul>
+            <li>Node.js 18 or later (<a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>)</li>
+            <li>Git</li>
+            <li>The AuthMatrix repo cloned locally</li>
+          </ul>
+          <pre class="small-code"><code>git clone https://github.com/sepand/AuthMatrix.git
+cd AuthMatrix
+npm install</code></pre>
+        </div>
+        <div>
+          <h3>Required for specific labs</h3>
+          <ul>
+            <li>Lab 2: Free <a href="https://developer.okta.com" target="_blank" rel="noopener">Okta Developer account</a></li>
+            <li>Lab 3: Microsoft 365 or <a href="https://azure.microsoft.com/free" target="_blank" rel="noopener">Azure free tier</a></li>
+            <li>Lab 4: Azure subscription (APIM resource)</li>
+            <li>Lab 5: <a href="https://www.postman.com/downloads/" target="_blank" rel="noopener">Postman</a> desktop app</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lab Cards -->
+    <div class="lab-list">
+
+      <a href={base + '/labs/lab-01'} class="lab-row">
+        <div class="lab-row-num">01</div>
+        <div class="lab-row-body">
+          <div class="lab-row-head">
+            <h2>Local RBAC &amp; JWT Fundamentals</h2>
+            <div class="lab-row-meta">
+              <span class="badge badge-beginner">Beginner</span>
+              <span class="badge badge-lab">No IdP</span>
+              <span class="lab-duration">30 min</span>
+            </div>
+          </div>
+          <p>Run the AuthMatrix app locally and log in as four different roles (Admin, Manager, Developer, Auditor). Observe how each role gets different HTTP responses from the API. Inspect the JWT token structure in the dashboard. Understand how Astro middleware and API middleware enforce RBAC independently.</p>
+          <div class="lab-row-tags">
+            <span>RBAC</span><span>JWT</span><span>Middleware</span><span>Bearer Token</span>
+          </div>
+        </div>
+        <span class="lab-row-arrow">&rarr;</span>
+      </a>
+
+      <a href={base + '/labs/lab-02'} class="lab-row">
+        <div class="lab-row-num">02</div>
+        <div class="lab-row-body">
+          <div class="lab-row-head">
+            <h2>Okta OIDC Authentication</h2>
+            <div class="lab-row-meta">
+              <span class="badge badge-intermediate">Intermediate</span>
+              <span class="badge badge-lab">Okta</span>
+              <span class="lab-duration">45 min</span>
+            </div>
+          </div>
+          <p>Configure Okta as a real OIDC provider. Create an application in the Okta dashboard, configure PKCE-based Auth Code flow, set up Okta Groups for role mapping, and validate RS256 tokens using Okta's JWKS endpoint.</p>
+          <div class="lab-row-tags">
+            <span>OIDC</span><span>PKCE</span><span>RS256</span><span>JWKS</span><span>Groups Claim</span>
+          </div>
+        </div>
+        <span class="lab-row-arrow">&rarr;</span>
+      </a>
+
+      <a href={base + '/labs/lab-03'} class="lab-row">
+        <div class="lab-row-num">03</div>
+        <div class="lab-row-body">
+          <div class="lab-row-head">
+            <h2>Microsoft Entra ID OIDC</h2>
+            <div class="lab-row-meta">
+              <span class="badge badge-intermediate">Intermediate</span>
+              <span class="badge badge-lab">Entra ID</span>
+              <span class="lab-duration">45 min</span>
+            </div>
+          </div>
+          <p>Configure Microsoft Entra ID (Azure AD) as an OIDC provider using App Roles &mdash; the enterprise-native approach. Learn how the <code>roles</code> claim differs from Okta's <code>groups</code> claim and why normalization matters for multi-IdP applications.</p>
+          <div class="lab-row-tags">
+            <span>Entra ID</span><span>App Roles</span><span>roles claim</span><span>OIDC</span><span>Azure Portal</span>
+          </div>
+        </div>
+        <span class="lab-row-arrow">&rarr;</span>
+      </a>
+
+      <a href={base + '/labs/lab-04'} class="lab-row">
+        <div class="lab-row-num">04</div>
+        <div class="lab-row-body">
+          <div class="lab-row-head">
+            <h2>API Gateway: Azure APIM with Dual-IdP JWT Validation</h2>
+            <div class="lab-row-meta">
+              <span class="badge badge-advanced">Advanced</span>
+              <span class="badge badge-lab">Azure APIM</span>
+              <span class="lab-duration">90 min</span>
+            </div>
+          </div>
+          <p>Deploy Azure API Management as the single enforcement perimeter for both Okta and Entra tokens. Configure inbound JWT validation policies for each IdP, normalize claims into a common header schema, and test from Postman. The only lab where both IdPs converge.</p>
+          <div class="lab-row-tags">
+            <span>Azure APIM</span><span>JWT Validation</span><span>Dual-IdP</span><span>Policy</span><span>Zero Trust</span>
+          </div>
+        </div>
+        <span class="lab-row-arrow">&rarr;</span>
+      </a>
+
+      <a href={base + '/labs/lab-05'} class="lab-row">
+        <div class="lab-row-num">05</div>
+        <div class="lab-row-body">
+          <div class="lab-row-head">
+            <h2>API Testing with Postman</h2>
+            <div class="lab-row-meta">
+              <span class="badge badge-beginner">Beginner</span>
+              <span class="badge badge-lab">Postman</span>
+              <span class="lab-duration">30 min</span>
+            </div>
+          </div>
+          <p>Test every AuthMatrix API endpoint across all four roles using three authentication strategies: local mock tokens, Okta OAuth 2.0 (Authorization Code + PKCE), and Microsoft Entra OAuth 2.0. Includes a pre-built Postman collection.</p>
+          <div class="lab-row-tags">
+            <span>Postman</span><span>API Testing</span><span>OAuth 2.0</span><span>Bearer Token</span>
+          </div>
+        </div>
+        <span class="lab-row-arrow">&rarr;</span>
+      </a>
+
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .labs-header { margin-bottom: 2.5rem; }
+  .labs-header h1 { margin-top: 0.75rem; font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 800; color: var(--primary); margin-bottom: 0.75rem; }
+
+  .prereq-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+  .prereq-box h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 1rem; }
+  .prereq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+  .prereq-box h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .prereq-box ul { padding-left: 1.25rem; }
+  .prereq-box li { font-size: 0.875rem; margin-bottom: 0.35rem; }
+  .prereq-box a { color: var(--primary); text-decoration: none; }
+  .prereq-box a:hover { text-decoration: underline; }
+  .small-code { background: #060b12; border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 1rem; font-family: var(--mono); font-size: 0.78rem; color: #94a3b8; margin-top: 0.75rem; overflow-x: auto; }
+  .small-code code { background: none; padding: 0; color: inherit; }
+
+  .lab-list { display: flex; flex-direction: column; gap: 1rem; }
+
+  .lab-row {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .lab-row:hover { border-color: var(--purple); transform: translateX(2px); }
+
+  .lab-row-num {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--purple);
+    opacity: 0.4;
+    flex-shrink: 0;
+    width: 2.5rem;
+    line-height: 1;
+    padding-top: 0.2rem;
+  }
+
+  .lab-row-body { flex: 1; min-width: 0; }
+  .lab-row-head { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+  .lab-row-head h2 { font-size: 1.05rem; font-weight: 700; margin: 0; }
+  .lab-row-meta { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; flex-wrap: wrap; }
+  .lab-duration { font-size: 0.78rem; color: var(--muted); }
+  .lab-row-body p { font-size: 0.875rem; color: var(--muted); margin: 0 0 0.75rem; }
+  .lab-row-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .lab-row-tags span { font-size: 0.7rem; background: var(--surface-2); border: 1px solid var(--border); padding: 0.1rem 0.45rem; border-radius: 4px; color: var(--muted); }
+
+  .lab-row-arrow { color: var(--purple); font-size: 1.25rem; flex-shrink: 0; padding-top: 0.2rem; }
+
+  code { font-family: var(--mono); font-size: 0.875em; color: var(--primary); background: var(--primary-dim); padding: 0.1rem 0.35rem; border-radius: 4px; }
+
+  @media (max-width: 640px) {
+    .prereq-grid { grid-template-columns: 1fr; }
+    .lab-row-num { display: none; }
+  }
+</style>

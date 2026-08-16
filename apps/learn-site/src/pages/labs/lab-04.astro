@@ -1,0 +1,293 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout title="Lab 4 &mdash; API Gateway: Azure APIM with Dual-IdP JWT Validation" section="Labs">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <aside class="toc">
+        <span class="toc-label">In this lab</span>
+        <ul>
+          <li><a href="#architecture-what-you-will-build">Architecture</a></li>
+          <li><a href="#part-a">Part A &mdash; Create Azure APIM Instance</a></li>
+          <li><a href="#part-b">Part B &mdash; Create the API Definition</a></li>
+          <li><a href="#part-c">Part C &mdash; Apply Dual-IdP Policy</a></li>
+          <li><a href="#part-d">Part D &mdash; Update Express API</a></li>
+          <li><a href="#part-e">Part E &mdash; Test APIM Gateway</a></li>
+          <li><a href="#part-f">Part F &mdash; APIM Policy Debugging</a></li>
+          <li><a href="#checklist">Validation Checklist</a></li>
+        </ul>
+        <hr class="toc-divider" />
+        <nav class="toc-nav">
+          <a href={base + '/labs'}>All Labs</a>
+          <a href={base + '/labs/lab-03'}>&larr; Previous Lab</a>
+          <a href={base + '/labs/lab-05'}>Next Lab &rarr;</a>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <div class="page-header">
+          <span class="badge badge-lab">Lab 4</span>
+          <h1>API Gateway: Azure APIM with Dual-IdP JWT Validation</h1>
+          <div class="lab-info-bar">
+            <div class="lab-info-item">
+              <span class="lab-info-label">Duration</span>
+              ~90 minutes
+            </div>
+            <div class="lab-info-item">
+              <span class="lab-info-label">Prerequisites</span>
+              Lab 1 complete, Lab 2 or 3 complete, Azure CLI installed
+            </div>
+          </div>
+        </div>
+
+        <div class="callout tip">
+          <strong>&#128113; Zero Trust Principle:</strong> Assume Breach &mdash; the API Gateway is the single enforcement perimeter. It validates every token cryptographically, normalizes claims from both Okta and Entra into a common header schema, and backends never see raw IdP tokens.
+        </div>
+        <hr />
+
+        <h2 id="architecture-what-you-will-build">Architecture: What You Will Build</h2>
+        <pre><code>Your App (localhost:3000)
+    │
+    │  Bearer JWT from Okta OR Entra
+    │
+    ▼
+Azure API Management (cloud)
+    │
+    ├─ 1. Strip X-User-* headers (prevent spoofing)
+    ├─ 2. Detect issuer (Okta or Entra)
+    ├─ 3a. Validate Okta JWT via Okta JWKS
+    │      Map groups[] → X-App-Roles
+    ├─ 3b. Validate Entra JWT via Entra JWKS
+    │      Map roles[] → X-App-Roles
+    ├─ 4. Inject: X-User-Id, X-User-Email, X-App-Roles, X-Idp-Source
+    └─ 5. DELETE Authorization header
+    │
+    ▼
+Express API Server (localhost:4000)
+    Reads only X-App-Roles — never sees raw token</code></pre>
+        <hr />
+
+        <h2 id="part-a">Part A &mdash; Create Azure APIM Instance</h2>
+        <h3>Step 1: Log in to Azure Portal</h3>
+        <p>Go to: <strong>https://portal.azure.com</strong></p>
+
+        <h3>Step 2: Create a Resource Group</h3>
+        <ol>
+          <li>In the top search bar, type <strong>Resource groups</strong></li>
+          <li>Click <strong>+ Create</strong></li>
+          <li>Fill in details and click <strong>Review + create</strong> &rarr; <strong>Create</strong></li>
+        </ol>
+
+        <h3>Step 3: Search for API Management</h3>
+        <ol>
+          <li>In the top search bar, type <strong>API Management</strong></li>
+          <li>Click <strong>API Management services</strong></li>
+          <li>Click <strong>+ Create</strong></li>
+        </ol>
+
+        <h3>Step 4: Fill in the APIM creation form</h3>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+          </tr>
+          <tr>
+            <td><strong>Resource name</strong></td>
+            <td><code>authmatrix-apim</code> (must be globally unique)</td>
+          </tr>
+          <tr>
+            <td><strong>Organization name</strong></td>
+            <td><code>AuthMatrix Lab</code></td>
+          </tr>
+          <tr>
+            <td><strong>Pricing tier</strong></td>
+            <td><strong>Developer</strong> or <strong>Consumption</strong></td>
+          </tr>
+        </table>
+        <p>Click <strong>Review + create</strong> &rarr; <strong>Create</strong>.</p>
+        <div class="callout warning">
+          <strong>&#9888;&#65039; Cost warning:</strong> Developer tier costs approximately $50/month. Use the <strong>Consumption</strong> tier for a pay-per-call model.
+        </div>
+
+        <h3>Step 5: Wait for deployment to complete</h3>
+        <p>When you get the notification <strong>"Deployment succeeded"</strong>, click <strong>Go to resource</strong>.</p>
+        <hr />
+
+        <h2 id="part-b">Part B &mdash; Create the API Definition in APIM</h2>
+        <h3>Step 6: Create a new API</h3>
+        <ol>
+          <li>In your APIM instance left sidebar, click <strong>APIs</strong></li>
+          <li>Click <strong>+ Add API</strong></li>
+          <li>Select <strong>HTTP</strong> (manual definition)</li>
+          <li>Fill in the details:
+            <ul>
+              <li><strong>Display name:</strong> <code>AuthMatrix Resource Server</code></li>
+              <li><strong>Web service URL:</strong> <code>http://host.docker.internal:4000</code> or your ngrok URL</li>
+              <li><strong>API URL suffix:</strong> <code>api</code></li>
+            </ul>
+          </li>
+        </ol>
+        <p>Click <strong>Create</strong>.</p>
+
+        <h3>Step 7: Add API operations</h3>
+        <p>Click <strong>+ Add operation</strong> for each endpoint:</p>
+        <table>
+          <tr>
+            <th>Operation</th>
+            <th>Method</th>
+            <th>URL Template</th>
+            <th>Display Name</th>
+          </tr>
+          <tr>
+            <td>1</td>
+            <td>GET</td>
+            <td><code>/protected/me</code></td>
+            <td>Get My Identity</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>GET</td>
+            <td><code>/protected/reports</code></td>
+            <td>Get Reports</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>POST</td>
+            <td><code>/protected/reports</code></td>
+            <td>Create Report</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>GET</td>
+            <td><code>/protected/users</code></td>
+            <td>List Users</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>POST</td>
+            <td><code>/protected/users</code></td>
+            <td>Create User</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>GET</td>
+            <td><code>/protected/audit</code></td>
+            <td>Get Audit Log</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>DELETE</td>
+            <td><code>/protected/audit</code></td>
+            <td>Purge Audit Log</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>PUT</td>
+            <td><code>/protected/settings</code></td>
+            <td>Update Settings</td>
+          </tr>
+        </table>
+        <p>For each: fill in <strong>Display name</strong> and <strong>URL</strong>, then click <strong>Save</strong>.</p>
+        <hr />
+
+        <h2 id="part-c">Part C &mdash; Apply the Dual-IdP Inbound Policy</h2>
+        <h3>Step 8: Open the All Operations policy editor</h3>
+        <ol>
+          <li>In your API, click <strong>All operations</strong> in the left list</li>
+          <li>Click the <strong>Policies</strong> tab</li>
+          <li>Click <strong>Policy code editor</strong></li>
+        </ol>
+
+        <h3>Step 9: Paste the dual-IdP policy</h3>
+        <p>Open the file at <code>config/azure-apim-policy.xml</code> in this repo. Paste its full content into the APIM policy editor.</p>
+
+        <h3>Step 10: Customize the policy for your tenants</h3>
+        <p>In the policy XML, replace the placeholder values (e.g., your Okta domain, your Azure Tenant ID) and click <strong>Save</strong>.</p>
+        <hr />
+
+        <h2 id="part-d">Part D &mdash; Update the Express API to Trust Gateway Headers</h2>
+        <h3>Step 11: Add gateway header mode to the auth middleware</h3>
+        <p>Add this new endpoint to <code>apps/api-server/src/index.ts</code>:</p>
+        <pre><code class="language-typescript"><span class="c">// &mdash;&mdash; APIM GATEWAY MODE: Read pre-validated headers from APIM &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</span>
+app.get('/api/gateway/me', (req, res) => &#123;
+  const userId  = req.headers&#91;'x-user-id'&#93;;
+  const email   = req.headers&#91;'x-user-email'&#93;;
+  const roles   = (req.headers&#91;'x-app-roles'&#93; as string || '').split(',').filter(Boolean);
+  const idpSrc  = req.headers&#91;'x-idp-source'&#93;;
+
+  if (!userId) &#123;
+    return res.status(401).json(&#123; error: 'Missing X-User-Id header &mdash; request must come via APIM' &#125;);
+  &#125;
+
+  res.json(&#123;
+    message:  '&#9989; Identity verified via Azure APIM gateway',
+    identity: &#123; userId, email, roles, idpSource: idpSrc &#125;,
+  &#125;);
+&#125;);</code></pre>
+
+        <h3>Step 12: Restart the API server</h3>
+        <pre><code class="language-bash">npm run dev --workspace=apps/api-server</code></pre>
+        <hr />
+
+        <h2 id="part-e">Part E &mdash; Test the APIM Gateway Flow</h2>
+        <h3>Step 13: Get a real token from your IdP</h3>
+        <p>Use the AuthMatrix dashboard to sign in with Okta or Entra. Get the access token.</p>
+
+        <h3>Step 14: Test APIM using curl</h3>
+        <pre><code class="language-bash">curl -H "Authorization: Bearer YOUR_OKTA_OR_ENTRA_TOKEN" \
+     https://authmatrix-apim.azure-api.net/api/protected/me</code></pre>
+
+        <h3>Step 15: Test Okta token then Entra token through the SAME APIM gateway</h3>
+        <ol>
+          <li>Get an Okta access token &rarr; send to APIM &rarr; observe <code>X-Idp-Source: okta</code></li>
+          <li>Get an Entra access token &rarr; send to APIM &rarr; observe <code>X-Idp-Source: entra</code></li>
+        </ol>
+        <p><strong>The backend API receives identical <code>X-App-Roles: Admin</code> regardless of which IdP authenticated the user. The backend is fully IdP-agnostic.</strong></p>
+
+        <h3>Step 16: Test unauthorized access</h3>
+        <pre><code class="language-bash">curl https://authmatrix-apim.azure-api.net/api/protected/me
+<span class="c"># Should get 401 from APIM</span></code></pre>
+        <hr />
+
+        <h2 id="part-f">Part F &mdash; APIM Policy Debugging</h2>
+        <h3>Step 17: Enable APIM tracing</h3>
+        <ol>
+          <li>In the Azure Portal &rarr; your APIM &rarr; <strong>APIs</strong> &rarr; <strong>AuthMatrix Resource Server</strong></li>
+          <li>Click <strong>Test</strong> tab</li>
+          <li>Select <strong>GET /protected/me</strong> operation</li>
+          <li>Add Authorization header and click <strong>Trace</strong></li>
+        </ol>
+        <hr />
+
+        <h2 id="checklist">&#9989; Lab 4 Complete &mdash; Validation Checklist</h2>
+        <ul>
+          <li>APIM instance created and deployed</li>
+          <li>API operations defined for all AuthMatrix endpoints</li>
+          <li>Dual-IdP policy XML applied from <code>config/azure-apim-policy.xml</code></li>
+          <li>Policy customized with your Okta domain and Entra Tenant ID</li>
+          <li>Express API server reachable from APIM (via ngrok or App Service)</li>
+          <li>Okta token sent through APIM &rarr; 200 response</li>
+          <li>Entra token sent through APIM &rarr; 200 response</li>
+          <li>Tampered token &rarr; 401 from APIM</li>
+        </ul>
+
+        <div class="page-footer">
+          <div class="prev-next">
+            <a href={base + '/labs/lab-03'} class="prev"><span class="prev-next-label">Previous</span>Lab 3</a>
+            <a href={base + '/labs/lab-05'} class="next"><span class="prev-next-label">Next</span>Lab 5</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.lab-info-bar { display:flex; gap:1.5rem; flex-wrap:wrap; margin:1rem 0 2rem; padding:1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+.lab-info-item { font-size:0.875rem; } 
+.lab-info-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); display:block; margin-bottom:0.2rem; }
+.step-block { border-left:2px solid var(--border); padding-left:1.25rem; margin-bottom:2rem; }
+.step-block h3 { color:var(--primary); }
+</style>

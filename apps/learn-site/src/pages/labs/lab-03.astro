@@ -1,0 +1,436 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout title="Lab 3 &mdash; Microsoft Entra ID OIDC Authentication" section="Labs">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <aside class="toc">
+        <span class="toc-label">In this lab</span>
+        <ul>
+          <li><a href="#okta-vs-entra-key-difference-in-role-model">Okta vs Entra</a></li>
+          <li><a href="#what-happens">What Happens End-to-End</a></li>
+          <li><a href="#part-a">Part A &mdash; Azure App Registration Setup</a></li>
+          <li><a href="#part-b">Part B &mdash; Create the App Registration</a></li>
+          <li><a href="#part-c">Part C &mdash; Define App Roles</a></li>
+          <li><a href="#part-d">Part D &mdash; Assign Roles to Users</a></li>
+          <li><a href="#part-e">Part E &mdash; Configure API Permissions</a></li>
+          <li><a href="#part-f">Part F &mdash; Configure Your Local Environment</a></li>
+          <li><a href="#part-g">Part G &mdash; Test Entra ID Sign-In</a></li>
+          <li><a href="#part-h">Part H &mdash; Test Role-Based Access</a></li>
+          <li><a href="#part-i">Part I &mdash; Token Inspection</a></li>
+          <li><a href="#checklist">Validation Checklist</a></li>
+        </ul>
+        <hr class="toc-divider" />
+        <nav class="toc-nav">
+          <a href={base + '/labs'}>All Labs</a>
+          <a href={base + '/labs/lab-02'}>&larr; Previous Lab</a>
+          <a href={base + '/labs/lab-04'}>Next Lab &rarr;</a>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <div class="page-header">
+          <span class="badge badge-lab">Lab 3</span>
+          <h1>Microsoft Entra ID OIDC Authentication</h1>
+          <div class="lab-info-bar">
+            <div class="lab-info-item">
+              <span class="lab-info-label">Duration</span>
+              ~45 minutes
+            </div>
+            <div class="lab-info-item">
+              <span class="lab-info-label">Prerequisites</span>
+              Lab 1 complete &middot; Microsoft 365 or Azure subscription
+            </div>
+          </div>
+        </div>
+
+        <div class="callout tip">
+          <strong>&#128113; Zero Trust Principle:</strong> Verify Explicitly &mdash; every sign-in triggers a cryptographically signed RS256 token from Entra, validated server-side via Microsoft's JWKS endpoint before any session is granted.
+        </div>
+
+        <p><strong>What you will build:</strong> A real Entra ID OIDC sign-in flow using <strong>App Roles</strong> (not groups) &mdash; the enterprise-native role assignment model in Azure AD.</p>
+        <hr />
+
+        <h2 id="okta-vs-entra-key-difference-in-role-model">Okta vs Entra: Key Difference in Role Model</h2>
+        <table>
+          <tr>
+            <th></th>
+            <th>Okta (Lab 2)</th>
+            <th>Entra ID (This Lab)</th>
+          </tr>
+          <tr>
+            <td><strong>Role source</strong></td>
+            <td><code>groups</code> claim (Okta Groups)</td>
+            <td><code>roles</code> claim (Entra App Roles)</td>
+          </tr>
+          <tr>
+            <td><strong>Where roles are defined</strong></td>
+            <td>Okta Admin &rarr; Groups</td>
+            <td>Azure Portal &rarr; App Registration &rarr; Manifest</td>
+          </tr>
+          <tr>
+            <td><strong>Where roles are assigned</strong></td>
+            <td>User added to Okta Group</td>
+            <td>User/Group assigned to App Role in Enterprise App</td>
+          </tr>
+          <tr>
+            <td><strong>Token claim shape</strong></td>
+            <td><code>"groups": ["Admin","Everyone"]</code></td>
+            <td><code>"roles": ["Admin"]</code></td>
+          </tr>
+          <tr>
+            <td><strong>Transformation needed</strong></td>
+            <td>Group name &rarr; role name mapping</td>
+            <td>Direct &mdash; already uses internal vocabulary</td>
+          </tr>
+        </table>
+        <hr />
+
+        <h2 id="what-happens">What Happens End-to-End</h2>
+        <pre><code>Browser                 Astro Server              Entra ID
+   │                        │                       │
+   │── Click "Sign in" ───► │                       │
+   │                        │── Build /authorize ──►│
+   │◄── Redirect to Entra ──│   (PKCE + state)      │
+   │                        │                       │
+   │── Login at Entra ─────────────────────────────►│
+   │◄── Redirect /callback?code=... ────────────────│
+   │                        │                       │
+   │── GET /callback ──────►│                       │
+   │                        │── POST /token ─────────►│
+   │                        │◄─ id_token (roles[])    │
+   │                        │                       │
+   │                        │── Fetch JWKS ──────────►│
+   │                        │◄─ Microsoft Public Keys │
+   │                        │                       │
+   │                        │   Verify RS256 sig     │
+   │                        │   Extract roles[]      │
+   │                        │   (no mapping needed)  │
+   │                        │   Create session JWT   │
+   │◄── Set cookie ─────────│                       │
+   │── GET /dashboard ─────►│                       │</code></pre>
+        <hr />
+
+        <h2 id="part-a">Part A &mdash; Azure App Registration Setup</h2>
+        <h3>Step 1: Sign in to the Azure Portal</h3>
+        <p>Go to: <strong>https://portal.azure.com</strong></p>
+        <p>Sign in with your Microsoft account.</p>
+
+        <h3>Step 2: Navigate to Entra ID</h3>
+        <ol>
+          <li>In the top search bar, type <strong>Microsoft Entra ID</strong></li>
+          <li>Click <strong>Microsoft Entra ID</strong> from the results</li>
+        </ol>
+
+        <h3>Step 3: Record your Tenant ID</h3>
+        <p>On the Entra ID Overview page, you will see:</p>
+        <ul>
+          <li><strong>Tenant ID</strong> (also called Directory ID): A UUID like <code>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code></li>
+        </ul>
+        <p>Copy and save this &mdash; you will need it for your <code>.env</code> file.</p>
+        <hr />
+
+        <h2 id="part-b">Part B &mdash; Create the App Registration</h2>
+        <h3>Step 4: Go to App registrations</h3>
+        <ol>
+          <li>In the left sidebar under Entra ID, click <strong>App registrations</strong></li>
+          <li>Click <strong>+ New registration</strong></li>
+        </ol>
+
+        <h3>Step 5: Fill in the registration form</h3>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+          </tr>
+          <tr>
+            <td><strong>Name</strong></td>
+            <td><code>AuthMatrix Lab</code></td>
+          </tr>
+          <tr>
+            <td><strong>Supported account types</strong></td>
+            <td>Accounts in this organizational directory only (Single tenant)</td>
+          </tr>
+          <tr>
+            <td><strong>Redirect URI</strong></td>
+            <td>Select <strong>Web</strong> from the dropdown, then enter: <code>http://localhost:3000/api/auth/entra-callback</code></td>
+          </tr>
+        </table>
+        <p>Click <strong>Register</strong>.</p>
+
+        <h3>Step 6: Record your Application (Client) ID</h3>
+        <p>After registration, you land on the app's <strong>Overview</strong> page. Copy:</p>
+        <ul>
+          <li><strong>Application (client) ID</strong>: <code>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code></li>
+        </ul>
+        <p>This is your <code>ENTRA_CLIENT_ID</code>.</p>
+
+        <h3>Step 7: Create a Client Secret</h3>
+        <ol>
+          <li>In the left sidebar of your App Registration, click <strong>Certificates &amp; secrets</strong></li>
+          <li>Click <strong>+ New client secret</strong></li>
+          <li>Fill in:
+            <ul>
+              <li><strong>Description:</strong> <code>AuthMatrix Lab Secret</code></li>
+              <li><strong>Expires:</strong> 180 days</li>
+            </ul>
+          </li>
+          <li>Click <strong>Add</strong></li>
+          <li><strong>IMMEDIATELY copy the <code>Value</code> column</strong> &mdash; it is only shown once!</li>
+        </ol>
+        <div class="callout warning">
+          <strong>&#9888;&#65039; Critical:</strong> The secret value is only visible immediately after creation. If you navigate away, you must create a new one. Save it in your <code>.env</code> file right now.
+        </div>
+        <p>This is your <code>ENTRA_CLIENT_SECRET</code>.</p>
+        <hr />
+
+        <h2 id="part-c">Part C &mdash; Define App Roles</h2>
+        <p>Entra App Roles are defined directly in the App Registration manifest. This is different from Okta Groups &mdash; the roles are part of the application definition itself.</p>
+
+        <h3>Step 8: Open the App Roles configuration</h3>
+        <ol>
+          <li>In your App Registration left sidebar, click <strong>App roles</strong></li>
+          <li>Click <strong>+ Create app role</strong></li>
+        </ol>
+
+        <h3>Step 9: Create the Admin role</h3>
+        <p>Fill in the panel that appears on the right:</p>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+          </tr>
+          <tr>
+            <td><strong>Display name</strong></td>
+            <td><code>Admin</code></td>
+          </tr>
+          <tr>
+            <td><strong>Allowed member types</strong></td>
+            <td>Users/Groups</td>
+          </tr>
+          <tr>
+            <td><strong>Value</strong></td>
+            <td><code>Admin</code></td>
+          </tr>
+          <tr>
+            <td><strong>Description</strong></td>
+            <td><code>AuthMatrix system administrator with full access</code></td>
+          </tr>
+          <tr>
+            <td><strong>Do you want to enable this app role?</strong></td>
+            <td>&#9989; Yes</td>
+          </tr>
+        </table>
+        <p>Click <strong>Apply</strong>.</p>
+
+        <h3>Step 10: Create remaining roles</h3>
+        <p>Repeat Step 9 three more times for:</p>
+        <table>
+          <tr>
+            <th>Display Name</th>
+            <th>Value</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>Manager</code></td>
+            <td><code>Manager</code></td>
+            <td>AuthMatrix operational manager</td>
+          </tr>
+          <tr>
+            <td><code>Developer</code></td>
+            <td><code>Developer</code></td>
+            <td>AuthMatrix technical engineer</td>
+          </tr>
+          <tr>
+            <td><code>Auditor</code></td>
+            <td><code>Auditor</code></td>
+            <td>AuthMatrix read-only compliance auditor</td>
+          </tr>
+        </table>
+        <div class="callout note">
+          <strong>&#128204; Why the <code>Value</code> field matters:</strong> The <code>Value</code> is what appears in the <code>roles</code> claim of the token. Setting it to <code>Admin</code>, <code>Manager</code>, etc. means the token matches our internal role vocabulary exactly &mdash; no mapping table needed (unlike Okta groups).
+        </div>
+        <hr />
+
+        <h2 id="part-d">Part D &mdash; Assign Roles to Users via Enterprise Application</h2>
+        <p>App Roles are assigned through the <strong>Enterprise Application</strong> object, not the App Registration.</p>
+
+        <h3>Step 11: Navigate to Enterprise Applications</h3>
+        <ol>
+          <li>Go back to <strong>Microsoft Entra ID</strong> main page</li>
+          <li>In the left sidebar, click <strong>Enterprise applications</strong></li>
+          <li>Search for <strong>AuthMatrix Lab</strong></li>
+          <li>Click on it</li>
+        </ol>
+
+        <h3>Step 12: Assign yourself to the Admin role</h3>
+        <ol>
+          <li>In the left sidebar of the Enterprise App, click <strong>Users and groups</strong></li>
+          <li>Click <strong>+ Add user/group</strong></li>
+          <li>Under <strong>Users</strong>, click <strong>None selected</strong></li>
+          <li>Search for your own user account name</li>
+          <li>Click on your name to select it &rarr; click <strong>Select</strong></li>
+          <li>Under <strong>Select a role</strong>, click <strong>None selected</strong></li>
+          <li>Select <strong>Admin</strong> from the list &rarr; click <strong>Select</strong></li>
+          <li>Click <strong>Assign</strong></li>
+        </ol>
+        <p>You should now see your user listed with role <strong>Admin</strong>.</p>
+        <hr />
+
+        <h2 id="part-e">Part E &mdash; Configure API Permissions (for roles claim)</h2>
+        <p>By default, Entra includes the <code>roles</code> claim in access tokens when App Roles are assigned. However, you need to ensure the token is issued with the right audience.</p>
+
+        <h3>Step 13: Expose an API scope</h3>
+        <ol>
+          <li>Go back to your <strong>App Registration</strong> (not Enterprise App)</li>
+          <li>In the left sidebar, click <strong>Expose an API</strong></li>
+          <li>Next to <strong>Application ID URI</strong>, click <strong>Add</strong> (or it may auto-populate)</li>
+          <li>Accept the default URI or set it to <code>api://authmatrix-lab</code></li>
+          <li>Click <strong>Save</strong></li>
+        </ol>
+
+        <h3>Step 14: Verify token configuration</h3>
+        <ol>
+          <li>In the left sidebar, click <strong>Token configuration</strong></li>
+          <li>If you want the <code>roles</code> claim in <strong>ID tokens</strong> as well (for easier inspection):
+            <ul>
+              <li>Click <strong>+ Add optional claim</strong></li>
+              <li>Select <strong>ID</strong></li>
+              <li>Check <code>roles</code></li>
+              <li>Click <strong>Add</strong></li>
+            </ul>
+          </li>
+        </ol>
+        <hr />
+
+        <h2 id="part-f">Part F &mdash; Configure Your Local Environment</h2>
+        <h3>Step 15: Update your <code>.env</code> file</h3>
+        <p>Open <code>c:\GitHub\Learn IDM\.env</code>. Fill in the Entra section:</p>
+        <pre><code class="language-env"><span class="c"># &mdash;&mdash; MICROSOFT ENTRA ID SETTINGS &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</span>
+ENTRA_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+ENTRA_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+ENTRA_CLIENT_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+ENTRA_REDIRECT_URI=http://localhost:3000/api/auth/entra-callback</code></pre>
+        <p>Replace values with what you recorded.</p>
+
+        <h3>Step 16: Restart the Astro server</h3>
+        <pre><code class="language-bash">npm run dev --workspace=apps/astro-frontend</code></pre>
+        <hr />
+
+        <h2 id="part-g">Part G &mdash; Test Entra ID Sign-In</h2>
+        <h3>Step 17: Open the login page</h3>
+        <p>Navigate to: <strong>http://localhost:3000/login</strong></p>
+
+        <h3>Step 18: Click "Sign in with Microsoft Entra ID"</h3>
+        <p>What happens on the server:</p>
+        <ol>
+          <li><code>/api/auth/entra-login</code> generates PKCE <code>code_verifier</code> + <code>code_challenge</code></li>
+          <li>Sets <code>entra_pkce_verifier</code> and <code>entra_oauth_state</code> HttpOnly cookies</li>
+          <li>Redirects browser to Entra authorize endpoint</li>
+        </ol>
+
+        <h3>Step 19: Authenticate at Microsoft</h3>
+        <ol>
+          <li>Enter your <strong>Microsoft account email</strong> and password</li>
+          <li>Complete MFA if prompted</li>
+          <li>If asked <strong>"AuthMatrix Lab is requesting access to..."</strong> &mdash; click <strong>Accept</strong></li>
+        </ol>
+
+        <h3>Step 20: Observe the callback processing</h3>
+        <p>The Astro server's <code>entra-callback.ts</code> runs:</p>
+        <ol>
+          <li>&#9989; Validates <code>state</code> cookie (CSRF protection)</li>
+          <li>&#9989; POSTs to <code>https://login.microsoftonline.com/&#123;tenantId&#125;/oauth2/v2.0/token</code></li>
+          <li>&#9989; Receives <code>id_token</code> (RS256 signed by Microsoft)</li>
+          <li>&#9989; Fetches JWKS from Microsoft and Verifies RS256 signature</li>
+          <li>&#9989; Extracts <code>roles[]</code> claim &mdash; no mapping needed</li>
+          <li>&#9989; Creates normalized session JWT &rarr; sets <code>auth_token</code> HttpOnly cookie</li>
+          <li>&#9989; Redirects to <code>/dashboard</code></li>
+        </ol>
+
+        <h3>Step 21: Verify on the Dashboard</h3>
+        <ul>
+          <li><strong>Identity Provider badge:</strong> &#128312; <strong>Microsoft Entra</strong></li>
+          <li><strong>Subject (sub):</strong> A UUID like <code>a1b2c3d4-...</code></li>
+          <li><strong>Email:</strong> Your Microsoft account email</li>
+          <li><strong>Assigned Roles:</strong> <code>Admin</code></li>
+          <li><strong>Granted Permissions:</strong> All Admin permissions</li>
+        </ul>
+        <hr />
+
+        <h2 id="part-h">Part H &mdash; Test Role-Based Access</h2>
+        <h3>Step 22: Test API endpoints</h3>
+        <p>On the Dashboard API Tester, click each endpoint. Since you're assigned the <strong>Admin</strong> App Role, all should return 200.</p>
+
+        <h3>Step 23: Change your role assignment (test Auditor)</h3>
+        <ol>
+          <li>Go back to <strong>Azure Portal</strong> &rarr; <strong>Entra ID</strong> &rarr; <strong>Enterprise Applications</strong> &rarr; <strong>AuthMatrix Lab</strong></li>
+          <li>Click <strong>Users and groups</strong></li>
+          <li>Click on your existing assignment &rarr; click <strong>Edit assignment</strong></li>
+          <li>Under <strong>Select a role</strong>, choose <strong>Auditor</strong> instead</li>
+          <li>Click <strong>Assign</strong></li>
+          <li>Log out of AuthMatrix &rarr; sign back in with Entra</li>
+          <li>Dashboard should now show role <code>Auditor</code></li>
+          <li>Clicking <code>DELETE /audit</code> &rarr; returns <strong>403 Forbidden</strong> &#9989; (Auditor can read, not delete)</li>
+        </ol>
+        <hr />
+
+        <h2 id="part-i">Part I &mdash; Token Inspection</h2>
+        <h3>Step 25: Inspect raw Entra ID token (Advanced)</h3>
+        <p>To see the actual RS256 token Microsoft issued:</p>
+        <ol>
+          <li>Open browser DevTools &rarr; <strong>Network</strong> tab</li>
+          <li>Sign in with Entra</li>
+          <li>Find the request to <code>/api/auth/entra-callback</code> in the Network tab</li>
+        </ol>
+
+        <h3>Step 26: Compare with your session token</h3>
+        <p>In the dashboard JWT Inspector, your <strong>session token</strong> (what's stored in the cookie) shows:</p>
+        <pre><code class="language-json">&#123;
+  "iss": "https://authmatrix.local",
+  "idp": "entra",
+  "roles": &#91;"Admin"&#93;,
+  "permissions": &#91;"read:users", "write:users", ...&#93;
+&#125;</code></pre>
+        <div class="callout tip">
+          <strong>&#128113; Zero Trust Observation:</strong> The raw Entra token with Microsoft's issuer, tenant ID, and audience is validated and discarded server-side. The session token uses our normalized <code>authmatrix.local</code> issuer. The backend API only trusts this internal token &mdash; it never receives nor validates Entra tokens directly.
+        </div>
+        <hr />
+
+        <h2 id="checklist">&#9989; Lab 3 Complete &mdash; Validation Checklist</h2>
+        <ul>
+          <li>Signed into Azure Portal and found Tenant ID</li>
+          <li>Created App Registration <code>AuthMatrix Lab</code> with correct redirect URI</li>
+          <li>Created and saved Client Secret</li>
+          <li>Defined 4 App Roles: Admin, Manager, Developer, Auditor</li>
+          <li>Assigned own user to Admin role via Enterprise Application</li>
+          <li>Exposed API and set Application ID URI</li>
+          <li>Filled in <code>.env</code> with ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET</li>
+          <li>Login page shows "&#9989; Configured" for Entra</li>
+          <li>Clicked "Sign in with Microsoft Entra ID" &rarr; redirected to Microsoft login</li>
+          <li>Authenticated &rarr; returned to dashboard with &#128312; Entra badge</li>
+          <li>Dashboard shows correct email, <code>roles: ["Admin"]</code>, all permissions</li>
+          <li>Changed App Role to Auditor &rarr; confirmed 403 on DELETE /audit</li>
+          <li>Compared raw Entra <code>roles[]</code> claim with normalized session token</li>
+        </ul>
+
+        <div class="page-footer">
+          <div class="prev-next">
+            <a href={base + '/labs/lab-02'} class="prev"><span class="prev-next-label">Previous</span>Lab 2</a>
+            <a href={base + '/labs/lab-04'} class="next"><span class="prev-next-label">Next</span>Lab 4</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.lab-info-bar { display:flex; gap:1.5rem; flex-wrap:wrap; margin:1rem 0 2rem; padding:1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+.lab-info-item { font-size:0.875rem; } 
+.lab-info-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); display:block; margin-bottom:0.2rem; }
+.step-block { border-left:2px solid var(--border); padding-left:1.25rem; margin-bottom:2rem; }
+.step-block h3 { color:var(--primary); }
+</style>

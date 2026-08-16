@@ -1,0 +1,439 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout title="Lab 1 &mdash; Local RBAC & JWT Fundamentals" section="Labs">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <aside class="toc">
+        <span class="toc-label">In this lab</span>
+        <ul>
+          <li><a href="#objective">Objective</a></li>
+          <li><a href="#part-a">Part A &mdash; Start the Application</a></li>
+          <li><a href="#part-b">Part B &mdash; Log In as Each Role</a></li>
+          <li><a href="#part-c">Part C &mdash; Test API Authorization</a></li>
+          <li><a href="#part-d">Part D &mdash; JWT Inspection</a></li>
+          <li><a href="#checklist">Validation Checklist</a></li>
+        </ul>
+        <hr class="toc-divider" />
+        <nav class="toc-nav">
+          <a href={base + '/labs'}>All Labs</a>
+          <a href={base + '/labs/lab-02'}>Next Lab &rarr;</a>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <div class="page-header">
+          <span class="badge badge-lab">Lab 1</span>
+          <h1>Local RBAC &amp; JWT Fundamentals</h1>
+          <div class="lab-info-bar">
+            <div class="lab-info-item">
+              <span class="lab-info-label">Duration</span>
+              ~30 minutes
+            </div>
+            <div class="lab-info-item">
+              <span class="lab-info-label">Prerequisites</span>
+              Node.js 18+, this repo cloned
+            </div>
+          </div>
+        </div>
+
+        <div class="callout tip">
+          <strong>&#128113; Zero Trust Principle:</strong> Least Privilege &mdash; every role gets only the permissions it needs. Verify Explicitly &mdash; every API call validates a signed token, not a network location.
+        </div>
+
+        <p><strong>No IdP needed</strong> &mdash; everything runs locally.</p>
+        <hr />
+
+        <h2 id="objective">Objective</h2>
+        <p>By the end of this lab you will:</p>
+        <ol>
+          <li>Start the Astro frontend and Express API server locally</li>
+          <li>Log in as four different roles (Admin, Manager, Developer, Auditor)</li>
+          <li>Test every API endpoint and observe which roles get 200 vs 403</li>
+          <li>Inspect the JWT token structure in the dashboard</li>
+          <li>Understand how Astro middleware and API middleware each enforce RBAC independently</li>
+        </ol>
+        <hr />
+
+        <h2 id="part-a">Part A &mdash; Start the Application</h2>
+        <h3>Step 1: Copy the environment file</h3>
+        <p>Open a terminal in the project root (<code>c:\GitHub\Learn IDM</code>):</p>
+        <pre><code class="language-bash">copy .env.example .env</code></pre>
+        <div class="callout note">
+          <strong>&#8505;&#65039; Note:</strong> For Lab 1, you do <strong>not</strong> need to fill in any IdP credentials. The defaults work as-is.
+        </div>
+
+        <h3>Step 2: Install dependencies</h3>
+        <pre><code class="language-bash">npm install</code></pre>
+        <p>Expected output: <code>added XXX packages</code></p>
+
+        <h3>Step 3: Start the API server (Terminal 1)</h3>
+        <p>Open a new terminal window:</p>
+        <pre><code class="language-bash">npm run dev --workspace=apps/api-server</code></pre>
+        <p>Expected output:</p>
+        <pre><code>&#9889; [AuthMatrix API Server] running at http://localhost:4000
+   Public:    GET  http://localhost:4000/api/public
+   Protected: GET  http://localhost:4000/api/protected/me  (requires Bearer token)
+   Mock JWT:  POST http://localhost:4000/api/auth/mock-token &#123; "role": "Admin" &#125;</code></pre>
+
+        <h3>Step 4: Start the Astro frontend (Terminal 2)</h3>
+        <p>Open a second terminal window:</p>
+        <pre><code class="language-bash">npm run dev --workspace=apps/astro-frontend</code></pre>
+        <p>Expected output:</p>
+        <pre><code> astro  v5.x.x ready in XXX ms
+
+  Local    http://localhost:3000/</code></pre>
+
+        <h3>Step 5: Verify public API</h3>
+        <p>Open a browser or run:</p>
+        <pre><code class="language-bash">curl http://localhost:4000/api/public</code></pre>
+        <p>Expected response:</p>
+        <pre><code class="language-json">&#123;
+  "status": "online",
+  "message": "&#9889; AuthMatrix Public API &mdash; No authentication required",
+  "timestamp": "2026-..."
+&#125;</code></pre>
+        <p>&#9989; <strong>Validation:</strong> Both servers running and public endpoint responds. Continue to Part B.</p>
+        <hr />
+
+        <h2 id="part-b">Part B &mdash; Log In as Each Role</h2>
+        <h3>Step 6: Open the login page</h3>
+        <p>Navigate to: <strong>http://localhost:3000/login</strong></p>
+        <p>You should see:</p>
+        <ul>
+          <li><strong>Mode A: Local Role Simulator</strong> &mdash; four role buttons</li>
+          <li><strong>Mode B: Enterprise IdP</strong> &mdash; Okta and Entra buttons showing "&#9888;&#65039; Not configured" (expected for Lab 1)</li>
+        </ul>
+
+        <h3>Step 7: Log in as Admin</h3>
+        <p>Click <strong>&#128081; Admin</strong>.</p>
+        <p><strong>What happens:</strong></p>
+        <ol>
+          <li>Browser POSTs to <code>/api/auth/login</code> with <code>role=Admin</code></li>
+          <li>Server creates a signed HS256 JWT with Admin permissions</li>
+          <li>Sets an HttpOnly <code>auth_token</code> cookie</li>
+          <li>Redirects to <code>/dashboard</code></li>
+        </ol>
+        <p><strong>Verify on the dashboard:</strong></p>
+        <ul>
+          <li>Identity Provider shows: &#128187; <strong>Local Simulator</strong></li>
+          <li>Assigned Roles: <code>Admin</code></li>
+          <li>Granted Permissions: <code>read:users</code>, <code>write:users</code>, <code>delete:users</code>, <code>read:reports</code>, <code>write:reports</code>, <code>write:settings</code>, <code>read:audit</code>, <code>delete:audit</code>, <code>execute:jobs</code></li>
+        </ul>
+        <hr />
+
+        <h2 id="part-c">Part C &mdash; Test API Authorization (Full Matrix)</h2>
+        <h3>Step 8: Use the API Endpoint Tester</h3>
+        <p>On the Dashboard, scroll to <strong>API Endpoint Tester</strong>. Click each button and record the response status.</p>
+        <div class="callout note">
+          <strong>&#128161; Tip:</strong> The tester sends your current session token as <code>Authorization: Bearer &lt;JWT&gt;</code> to the API server.
+        </div>
+
+        <h4>Expected Results &mdash; Admin</h4>
+        <table>
+          <tr>
+            <th>Endpoint</th>
+            <th>Method</th>
+            <th>Expected Status</th>
+            <th>Permission Required</th>
+          </tr>
+          <tr>
+            <td><code>/api/protected/me</code></td>
+            <td>GET</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td>(any auth)</td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/reports</code></td>
+            <td>GET</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>read:reports</code></td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/reports</code></td>
+            <td>POST</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>write:reports</code></td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/jobs</code></td>
+            <td>GET</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>execute:jobs</code></td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/users</code></td>
+            <td>POST</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>write:users</code></td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/audit</code></td>
+            <td>GET</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>read:audit</code></td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/settings</code></td>
+            <td>PUT</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>write:settings</code></td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/users/42</code></td>
+            <td>DELETE</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>delete:users</code></td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/audit</code></td>
+            <td>DELETE</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>delete:audit</code></td>
+          </tr>
+        </table>
+
+        <h3>Step 9: Log out and log in as Auditor</h3>
+        <ol>
+          <li>Click <strong>Logout</strong> in the top navigation</li>
+          <li>Click <strong>&#128269; Auditor</strong> on the login page</li>
+        </ol>
+
+        <h4>Expected Results &mdash; Auditor</h4>
+        <table>
+          <tr>
+            <th>Endpoint</th>
+            <th>Method</th>
+            <th>Expected Status</th>
+            <th>Reason</th>
+          </tr>
+          <tr>
+            <td><code>/api/protected/me</code></td>
+            <td>GET</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td>Any auth</td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/reports</code></td>
+            <td>GET</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>read:reports</code> &#10003;</td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/audit</code></td>
+            <td>GET</td>
+            <td>&#9989; <strong>200</strong></td>
+            <td><code>read:audit</code> &#10003;</td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/jobs</code></td>
+            <td>GET</td>
+            <td>&#10060; <strong>403</strong></td>
+            <td><code>execute:jobs</code> &mdash; Auditor doesn't have this</td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/users</code></td>
+            <td>POST</td>
+            <td>&#10060; <strong>403</strong></td>
+            <td><code>write:users</code> &mdash; not in Auditor permissions</td>
+          </tr>
+          <tr>
+            <td><code>/api/protected/audit</code></td>
+            <td>DELETE</td>
+            <td>&#10060; <strong>403</strong></td>
+            <td><code>delete:audit</code> &mdash; Admin only</td>
+          </tr>
+        </table>
+
+        <h3>Step 10: Test role-based page access as Auditor</h3>
+        <p>Try navigating directly to:</p>
+        <table>
+          <tr>
+            <th>URL</th>
+            <th>Expected</th>
+            <th>Reason</th>
+          </tr>
+          <tr>
+            <td><code>/dashboard</code></td>
+            <td>&#9989; Allowed</td>
+            <td>Auditor has dashboard access</td>
+          </tr>
+          <tr>
+            <td><code>/dashboard/audit</code></td>
+            <td>&#9989; Allowed</td>
+            <td>Auditor + Admin can access</td>
+          </tr>
+          <tr>
+            <td><code>/dashboard/reports</code></td>
+            <td>&#10060; <strong>403 Forbidden</strong></td>
+            <td>Requires Manager, Developer, or Admin</td>
+          </tr>
+          <tr>
+            <td><code>/dashboard/admin</code></td>
+            <td>&#10060; <strong>403 Forbidden</strong></td>
+            <td>Admin only</td>
+          </tr>
+        </table>
+        <div class="callout tip">
+          <strong>&#128113; Zero Trust Observation:</strong> Notice that <code>/dashboard/reports</code> blocks at the <strong>Astro middleware</strong> layer (before the page even renders), AND the API also returns 403 independently. These are two separate enforcement points.
+        </div>
+
+        <h3>Step 11: Full Role/Endpoint Matrix</h3>
+        <p>Repeat Steps 8-9 for Manager and Developer. Fill in this table:</p>
+        <table>
+          <tr>
+            <th>Endpoint</th>
+            <th>Admin</th>
+            <th>Manager</th>
+            <th>Developer</th>
+            <th>Auditor</th>
+          </tr>
+          <tr>
+            <td>GET /me</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+          </tr>
+          <tr>
+            <td>GET /reports</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+          </tr>
+          <tr>
+            <td>POST /reports</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+          </tr>
+          <tr>
+            <td>GET /users</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+          </tr>
+          <tr>
+            <td>POST /users</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+          </tr>
+          <tr>
+            <td>DELETE /users/:id</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+          </tr>
+          <tr>
+            <td>GET /jobs</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+          </tr>
+          <tr>
+            <td>GET /audit</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+            <td>&#9989;</td>
+          </tr>
+          <tr>
+            <td>DELETE /audit</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+          </tr>
+          <tr>
+            <td>PUT /settings</td>
+            <td>&#9989;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+            <td>&#10060;</td>
+          </tr>
+        </table>
+        <hr />
+
+        <h2 id="part-d">Part D &mdash; JWT Inspection</h2>
+        <h3>Step 12: Inspect your JWT</h3>
+        <p>Log in as any role. On the Dashboard, scroll to <strong>JWT Inspector</strong>.</p>
+        <p>You will see three panels:</p>
+        <ol>
+          <li><strong>HEADER</strong> &mdash; <code>&#123;&quot;alg&quot;: &quot;HS256&quot;, &quot;typ&quot;: &quot;JWT&quot;&#125;</code></li>
+          <li><strong>PAYLOAD</strong> &mdash; your claims: <code>sub</code>, <code>email</code>, <code>roles</code>, <code>permissions</code>, <code>iss</code>, <code>aud</code>, <code>exp</code></li>
+          <li><strong>RAW TOKEN</strong> &mdash; the full <code>xxxxx.yyyyy.zzzzz</code> format</li>
+        </ol>
+
+        <h3>Step 13: Verify the expiry claim</h3>
+        <p>In the PAYLOAD panel, find <code>"exp"</code>. This is a Unix timestamp.</p>
+        <p>Convert it:</p>
+        <pre><code class="language-javascript"><span class="c">// In browser DevTools console:</span>
+new Date(1755012345 * 1000).toLocaleString()
+<span class="c">// Replace 1755012345 with your actual exp value</span></code></pre>
+        <p>Expected: A timestamp 4 hours from now (session lifetime).</p>
+
+        <h3>Step 14: Decode the raw token at jwt.io</h3>
+        <ol>
+          <li>Copy the <strong>RAW TOKEN</strong> value from the inspector</li>
+          <li>Open <strong>https://jwt.io</strong> in a new tab</li>
+          <li>Paste the token in the <strong>Encoded</strong> box on the left</li>
+          <li>Observe the decoded header and payload on the right</li>
+        </ol>
+        <div class="callout note">
+          <strong>&#128273; Try the signature verification:</strong> In the "VERIFY SIGNATURE" section at jwt.io, enter <code>authmatrix-local-super-secret-key-2026</code> as the secret. The signature badge should turn <strong>blue (verified)</strong>.
+        </div>
+
+        <h3>Step 15: Try forging a token (Educational)</h3>
+        <p>At jwt.io, change <code>"roles": ["Developer"]</code> to <code>"roles": ["Admin"]</code> in the payload.</p>
+        <ol>
+          <li>Copy the new token from jwt.io (it will have an invalid signature)</li>
+          <li>Open browser DevTools &rarr; Application &rarr; Cookies &rarr; delete <code>auth_token</code></li>
+          <li>Set a new cookie named <code>auth_token</code> with the forged token value</li>
+          <li>Refresh the dashboard</li>
+        </ol>
+        <p><strong>Expected:</strong> You are logged out or see an error. The middleware runs:</p>
+        <pre><code class="language-typescript">jwt.verify(tokenCookie, SESSION_SECRET) <span class="c">// throws &mdash; invalid signature</span></code></pre>
+        <div class="callout tip">
+          <strong>&#128113; Zero Trust Validation:</strong> Cryptographic signatures make tokens tamper-proof. Even if an attacker intercepts a token and modifies the payload, the signature no longer matches, and the server rejects it.
+        </div>
+        <hr />
+
+        <h2 id="checklist">&#9989; Lab 1 Complete &mdash; Validation Checklist</h2>
+        <ul>
+          <li>Both servers started successfully (ports 3000 and 4000)</li>
+          <li>Logged in as all four roles</li>
+          <li>Confirmed 200 vs 403 pattern for each role/endpoint combination</li>
+          <li>Observed middleware 403 page for route-level blocking</li>
+          <li>Inspected JWT header, payload, and expiry</li>
+          <li>Verified token at jwt.io with the signing secret</li>
+          <li>Attempted token forgery and confirmed rejection</li>
+        </ul>
+        <p><strong>Next:</strong> <a href={base + '/labs/lab-02'}>Lab 2 &mdash; Okta OIDC Authentication</a></p>
+
+        <div class="page-footer">
+          <div class="prev-next">
+            <div></div>
+            <a href={base + '/labs/lab-02'} class="next"><span class="prev-next-label">Next</span>Lab 2</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.lab-info-bar { display:flex; gap:1.5rem; flex-wrap:wrap; margin:1rem 0 2rem; padding:1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+.lab-info-item { font-size:0.875rem; } 
+.lab-info-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); display:block; margin-bottom:0.2rem; }
+.step-block { border-left:2px solid var(--border); padding-left:1.25rem; margin-bottom:2rem; }
+.step-block h3 { color:var(--primary); }
+</style>

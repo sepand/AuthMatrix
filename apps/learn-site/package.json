@@ -1,0 +1,17 @@
+{
+  "name": "authmatrix-learn",
+  "version": "1.0.0",
+  "description": "AuthMatrix IAM Masterclass — public learning site deployed to GitHub Pages",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4321",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4"
+  }
+}

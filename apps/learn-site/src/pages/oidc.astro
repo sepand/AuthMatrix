@@ -1,0 +1,145 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout section="OIDC">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <nav class="toc">
+        <div class="toc-label">On this page</div>
+        <ul>
+          <li><a href="#problem">The Pseudo-Authentication Problem</a></li>
+          <li><a href="#what-is">What is OIDC?</a></li>
+          <li><a href="#comparison">SAML 2.0 vs OIDC vs OAuth 2.0</a></li>
+          <li><a href="#actors">OIDC Actors</a></li>
+          <li><a href="#id-token">The ID Token</a></li>
+          <li><a href="#scopes">OIDC Standard Scopes</a></li>
+          <li><a href="#discovery">OIDC Discovery</a></li>
+          <li><a href="#flow">Full OIDC Auth Code Flow</a></li>
+        </ul>
+      </nav>
+
+      <main class="content">
+        <header class="page-header">
+          <h1>OpenID Connect (OIDC)</h1>
+          <span class="badge badge-intermediate">Intermediate</span>
+        </header>
+
+        <section id="problem">
+          <h2>The Pseudo-Authentication Problem</h2>
+          <div class="callout warning">
+            <strong>Important:</strong> "OAuth 2.0 is not an authentication protocol."
+          </div>
+          <p>Developers often misused OAuth access tokens to log users in. This is dangerous because access tokens prove authorization to call an API, not the identity of the user. There was no standard way to get user info or know who the user was.</p>
+        </section>
+
+        <section id="what-is">
+          <h2>What is OIDC?</h2>
+          <p>From OIDC Core 1.0: <em>"OpenID Connect 1.0 is a simple identity layer on top of the OAuth 2.0 protocol."</em></p>
+          <p>OIDC adds 3 major components to OAuth 2.0:</p>
+          <ul>
+            <li><strong>ID Token</strong>: A standard JWT asserting the user's identity.</li>
+            <li><strong>UserInfo Endpoint</strong>: A standard API to retrieve user profile data.</li>
+            <li><strong>Discovery</strong>: A standard metadata endpoint (<code>/.well-known/openid-configuration</code>).</li>
+          </ul>
+        </section>
+
+        <section id="comparison">
+          <h2>Protocol Comparison</h2>
+          <table style="width:100%; border-collapse:collapse; margin-top:1rem;">
+            <thead>
+              <tr style="border-bottom:2px solid #ccc; text-align:left;">
+                <th>Feature</th>
+                <th>SAML 2.0</th>
+                <th>OAuth 2.0</th>
+                <th>OIDC</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #eee;"><td>Purpose</td><td>Authentication &amp; Federation</td><td>Delegated Authorization</td><td>Authentication &amp; Identity</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td>Format</td><td>XML</td><td>JSON / Various</td><td>JSON (JWT)</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td>Token Type</td><td>SAML Assertion</td><td>Access Token</td><td>ID Token (JWT)</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td>Transport</td><td>HTTP POST / Redirect</td><td>HTTP / APIs</td><td>HTTP / APIs</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td>Mobile/SPA Friendly</td><td>Poor</td><td>Excellent</td><td>Excellent</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td>Scopes</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td>User Info API</td><td>No</td><td>No</td><td>Yes (/userinfo)</td></tr>
+              <tr><td>Discovery API</td><td>XML Metadata</td><td>No standard initially</td><td>Yes (/.well-known)</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="actors">
+          <h2>OIDC Actors</h2>
+          <p>OIDC renames OAuth roles for clarity in an identity context:</p>
+          <ul>
+            <li><strong>End-User</strong>: Equivalent to OAuth Resource Owner.</li>
+            <li><strong>Relying Party (RP)</strong>: Equivalent to OAuth Client. The app relying on the identity.</li>
+            <li><strong>OpenID Provider (OP)</strong>: Equivalent to OAuth Authorization Server.</li>
+          </ul>
+        </section>
+
+        <section id="id-token">
+          <h2>The ID Token</h2>
+          <p>The ID Token is a JSON Web Token (JWT) intended specifically for the Relying Party. It asserts who the user is and when they authenticated.</p>
+          <div class="callout danger">
+            <strong>Security Rule:</strong> Never send an ID Token to a backend API to gain access. Use Access Tokens for APIs.
+          </div>
+          <p>Required claims in an ID token:</p>
+          <ul>
+            <li><code>iss</code>: Issuer identifier.</li>
+            <li><code>sub</code>: Subject identifier (user ID).</li>
+            <li><code>aud</code>: Audience (the Relying Party's client_id).</li>
+            <li><code>exp</code>: Expiration time.</li>
+            <li><code>iat</code>: Issued at time.</li>
+            <li><code>nonce</code>: String value used to mitigate replay attacks (required in some flows).</li>
+          </ul>
+        </section>
+
+        <section id="scopes">
+          <h2>OIDC Standard Scopes</h2>
+          <ul>
+            <li><code>openid</code>: REQUIRED. Informs the Authorization Server that the client is making an OpenID Connect request.</li>
+            <li><code>profile</code>: Requests default profile claims (name, family_name, picture, etc.).</li>
+            <li><code>email</code>: Requests email and email_verified claims.</li>
+            <li><code>address</code>: Requests address claim.</li>
+            <li><code>phone</code>: Requests phone_number and phone_number_verified claims.</li>
+            <li><code>offline_access</code>: Requests a Refresh Token for long-term access.</li>
+          </ul>
+        </section>
+
+        <section id="discovery">
+          <h2>OIDC Discovery</h2>
+          <p>A client can discover the configuration of an OpenID Provider by making a GET request to <code>/.well-known/openid-configuration</code>.</p>
+          <pre><code>GET /.well-known/openid-configuration HTTP/1.1
+Host: server.example.com</code></pre>
+          <pre><code>&#123;
+  "issuer": "https://server.example.com",
+  "authorization_endpoint": "https://server.example.com/connect/authorize",
+  "token_endpoint": "https://server.example.com/connect/token",
+  "jwks_uri": "https://server.example.com/jwks.json",
+  "userinfo_endpoint": "https://server.example.com/connect/userinfo"
+&#125;</code></pre>
+        </section>
+
+        <section id="flow">
+          <h2>Full OIDC Auth Code Flow</h2>
+          <ol>
+            <li><strong>Discover metadata:</strong> RP fetches OIDC Discovery document.</li>
+            <li><strong>Auth request:</strong> RP redirects browser to <code>/authorize</code> with <code>scope=openid</code>, <code>nonce</code>, and PKCE.</li>
+            <li><strong>Token request:</strong> RP exchanges code for tokens at <code>/token</code>.</li>
+            <li><strong>Validate ID token:</strong> RP validates the ID token signature, <code>iss</code>, <code>aud</code>, <code>exp</code>, and <code>nonce</code>.</li>
+            <li><strong>UserInfo endpoint:</strong> RP optionally calls <code>/userinfo</code> with the Access Token for more claims.</li>
+          </ol>
+        </section>
+
+        <footer class="page-footer">
+          <div class="prev-next">
+            <a href={base + '/flows'}>&larr; Prev: Grant Types</a>
+            <a href={base + '/tokens'}>Next: Tokens &amp; JWT &rarr;</a>
+          </div>
+        </footer>
+      </main>
+    </div>
+  </div>
+</Layout>

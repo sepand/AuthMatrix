@@ -8,7 +8,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   const role = formData.get('role')?.toString() || 'Developer';
 
   const rolePermissionMatrix: Record<string, string[]> = {
-    Admin: ['read:users', 'write:users', 'delete:users', 'read:reports', 'write:settings', 'read:audit', 'delete:audit'],
+    Admin: ['read:users', 'write:users', 'delete:users', 'read:reports', 'write:reports', 'write:settings', 'read:audit', 'delete:audit', 'execute:jobs'],
     Manager: ['read:users', 'read:reports', 'write:reports'],
     Developer: ['read:users', 'read:reports', 'execute:jobs'],
     Auditor: ['read:reports', 'read:audit']

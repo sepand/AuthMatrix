@@ -1,0 +1,127 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout section="OAuth 2.0">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <nav class="toc">
+        <div class="toc-label">On this page</div>
+        <ul>
+          <li><a href="#problem">The Problem OAuth Solves</a></li>
+          <li><a href="#what-is">What is OAuth 2.0?</a></li>
+          <li><a href="#actors">The Four Actors</a></li>
+          <li><a href="#scopes">Scopes &amp; Consent</a></li>
+          <li><a href="#clients">Public vs Confidential Clients</a></li>
+          <li><a href="#channels">Front Channel vs Back Channel</a></li>
+          <li><a href="#endpoints">OAuth Endpoints</a></li>
+          <li><a href="#security">Security Checklist</a></li>
+        </ul>
+      </nav>
+
+      <main class="content">
+        <header class="page-header">
+          <h1>OAuth 2.0 Fundamentals</h1>
+          <span class="badge badge-beginner">Beginner</span>
+        </header>
+
+        <section id="problem">
+          <h2>The Problem OAuth Solves</h2>
+          <p>Before OAuth, if an application needed access to a user's data on another service, the application typically asked the user for their username and password. This is known as the "password anti-pattern".</p>
+          <div class="callout danger">
+            <strong>Danger:</strong> Sharing passwords means the application has full control over the user's account, can impersonate them indefinitely, and the user cannot revoke access without changing their password.
+          </div>
+          <p>OAuth was created to solve this exact problem by allowing applications to obtain limited access without ever seeing the user's credentials.</p>
+        </section>
+
+        <section id="what-is">
+          <h2>What is OAuth 2.0?</h2>
+          <p>According to RFC 6749:</p>
+          <blockquote>
+            "The OAuth 2.0 authorization framework enables a third-party application to obtain limited access to an HTTP service."
+          </blockquote>
+          <p>A common analogy is the <strong>valet key</strong> for a car. A valet key allows the parking attendant to drive the car and park it, but it does not open the trunk or glove box. Similarly, OAuth provides a token that grants limited access to specific resources for a limited time.</p>
+        </section>
+
+        <section id="actors">
+          <h2>The Four Actors</h2>
+          <p>RFC 6749 Section 1.1 defines four roles in the OAuth ecosystem:</p>
+          <div style="display:flex; flex-direction:column; gap:1rem; margin:1rem 0;">
+            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>Resource Owner</strong>: The user who authorizes an application to access their account.
+            </div>
+            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>Client</strong>: The application requesting access on behalf of the Resource Owner.
+            </div>
+            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>Authorization Server</strong>: The server that authenticates the user and issues access tokens to the Client.
+            </div>
+            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>Resource Server</strong>: The API server that hosts the user's data and accepts access tokens.
+            </div>
+          </div>
+        </section>
+
+        <section id="scopes">
+          <h2>Scopes &amp; Consent</h2>
+          <p>Scopes define exactly what access the Client is requesting. When a user logs in, they are presented with a consent screen asking them to approve these specific scopes.</p>
+          <div class="callout note">
+            <strong>Example Scopes:</strong> <code>read:contacts</code>, <code>write:calendar</code>, <code>openid profile email</code>
+          </div>
+        </section>
+
+        <section id="clients">
+          <h2>Public vs Confidential Clients</h2>
+          <p>Clients are categorized by their ability to keep a secret secure.</p>
+          <ul>
+            <li><strong>Confidential Clients</strong>: Applications that execute on a secure server (e.g., Node.js, Java) and can safely store a <code>client_secret</code>.</li>
+            <li><strong>Public Clients</strong>: Applications that execute in the browser (SPAs) or on a mobile device. They cannot safely store a secret, as the source code or binary can be inspected.</li>
+          </ul>
+          <div class="callout danger">
+            <strong>Security Rule:</strong> Never embed a <code>client_secret</code> in client-side JavaScript or a mobile app.
+          </div>
+        </section>
+
+        <section id="channels">
+          <h2>Front Channel vs Back Channel</h2>
+          <p>OAuth communications happen over two different channels:</p>
+          <ul>
+            <li><strong>Front Channel</strong>: Communication happens via the user's browser URL. This is visible to the user and browser extensions. Used for authorization requests and redirects.</li>
+            <li><strong>Back Channel</strong>: Secure, server-to-server HTTPS POST requests. Invisible to the user. Used for token exchange and API calls.</li>
+          </ul>
+        </section>
+
+        <section id="endpoints">
+          <h2>OAuth Endpoints</h2>
+          <p>The standard defines several HTTP endpoints (RFC 6749 Section 3, plus extensions):</p>
+          <ul>
+            <li><code>/authorize</code>: Front-channel endpoint where the user logs in and grants consent.</li>
+            <li><code>/token</code>: Back-channel endpoint where the client exchanges a code for tokens.</li>
+            <li><code>/introspect</code> (RFC 7662): Endpoint for APIs to validate a token.</li>
+            <li><code>/revoke</code> (RFC 7009): Endpoint to invalidate a token.</li>
+          </ul>
+        </section>
+
+        <section id="security">
+          <h2>Security Checklist</h2>
+          <p>Based on the latest BCPs (RFC 9700):</p>
+          <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem;">
+            <div><input type="checkbox" checked disabled> <label>Use the <code>state</code> parameter to prevent CSRF.</label></div>
+            <div><input type="checkbox" checked disabled> <label>Require PKCE for all clients (including confidential clients).</label></div>
+            <div><input type="checkbox" checked disabled> <label>Strictly whitelist absolute Redirect URIs.</label></div>
+            <div><input type="checkbox" checked disabled> <label>Use short-lived access tokens and rotate refresh tokens.</label></div>
+            <div><input type="checkbox" checked disabled> <label>Use HTTPS everywhere.</label></div>
+          </div>
+        </section>
+
+        <footer class="page-footer">
+          <div class="prev-next">
+            <span></span>
+            <a href={base + '/flows'}>Next: Grant Types &rarr;</a>
+          </div>
+        </footer>
+      </main>
+    </div>
+  </div>
+</Layout>

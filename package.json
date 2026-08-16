@@ -9,8 +9,15 @@
   "scripts": {
     "dev:frontend": "npm run dev --workspace=apps/astro-frontend",
     "dev:api": "npm run dev --workspace=apps/api-server",
+    "dev:learn": "npm run dev --workspace=apps/learn-site",
     "dev": "npm run dev:frontend",
-    "build": "npm run build --workspaces"
+    "build:learn": "npm run build --workspace=apps/learn-site",
+    "build": "npm run build --workspaces",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "test:unit": "node --import tsx --test tests/unit/**/*.test.ts",
+    "test:api": "node --import tsx --test tests/api/**/*.test.ts",
+    "test:site": "node --import tsx --test tests/site/**/*.test.ts",
+    "test:e2e": "node --import tsx --test tests/e2e/**/*.test.ts"
   },
   "keywords": [
     "identity",

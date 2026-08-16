@@ -1,0 +1,184 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout section="Tokens & JWT">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <nav class="toc">
+        <div class="toc-label">On this page</div>
+        <ul>
+          <li><a href="#three-tokens">The Three Tokens</a></li>
+          <li><a href="#jwt">JWT Structure</a></li>
+          <li><a href="#claims">Standard JWT Claims</a></li>
+          <li><a href="#oidc-claims">OIDC Standard Claims</a></li>
+          <li><a href="#signing">RS256 vs HS256</a></li>
+          <li><a href="#jwks">JWKS (JSON Web Key Set)</a></li>
+          <li><a href="#endpoints">OAuth Endpoints</a></li>
+          <li><a href="#lifetime">Token Lifetime Strategy</a></li>
+        </ul>
+      </nav>
+
+      <main class="content">
+        <header class="page-header">
+          <h1>Tokens, JWT &amp; Claims</h1>
+          <span class="badge badge-advanced">Advanced</span>
+        </header>
+
+        <section id="three-tokens">
+          <h2>The Three Tokens</h2>
+          <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
+            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>Access Token</strong><br>
+              Audience: Resource Server (API)<br>
+              Purpose: Prove authorization to access data.<br>
+              Lifetime: Short (15m - 1h)<br>
+              Key Rule: Never read by the client. Send as Bearer token.
+            </div>
+            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>ID Token</strong><br>
+              Audience: Client (Relying Party)<br>
+              Purpose: Prove user identity and auth event.<br>
+              Lifetime: Short (5m - 15m)<br>
+              Key Rule: Never send to an API. Read by the client.
+            </div>
+            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>Refresh Token</strong><br>
+              Audience: Authorization Server<br>
+              Purpose: Get new access/ID tokens without prompting the user.<br>
+              Lifetime: Long (days/months)<br>
+              Key Rule: Must be stored securely.
+            </div>
+          </div>
+        </section>
+
+        <section id="jwt">
+          <h2>JWT Structure (RFC 7519)</h2>
+          <p>A JSON Web Token consists of three parts separated by dots (<code>.</code>): Header, Payload, and Signature.</p>
+          <div style="font-family:monospace; margin:1rem 0; word-break:break-all;">
+            <span style="color:#d35400;">eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjEyMyJ9</span>.<span style="color:#8e44ad;">eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiZXhwIjoxNTE2MjM5MDIyfQ</span>.<span style="color:#2980b9;">SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c</span>
+          </div>
+          <p>Decoded Header:</p>
+          <pre><code>&#123;
+  "alg": "RS256",
+  "typ": "JWT",
+  "kid": "123"
+&#125;</code></pre>
+        </section>
+
+        <section id="claims">
+          <h2>Standard JWT Claims (RFC 7519 Section 4.1)</h2>
+          <table style="width:100%; border-collapse:collapse; margin-top:1rem;">
+            <thead>
+              <tr style="border-bottom:2px solid #ccc; text-align:left;">
+                <th>Claim</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #eee;"><td><code>iss</code></td><td>Issuer - Who created and signed this token</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td><code>sub</code></td><td>Subject - Whom the token refers to</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td><code>aud</code></td><td>Audience - Who the token is intended for</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td><code>exp</code></td><td>Expiration Time - When the token expires</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td><code>nbf</code></td><td>Not Before - Time before which token must not be accepted</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td><code>iat</code></td><td>Issued At - Time the token was issued</td></tr>
+              <tr><td><code>jti</code></td><td>JWT ID - Unique identifier for the token</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="oidc-claims">
+          <h2>OIDC Standard Claims</h2>
+          <p>Defined in OIDC Core 1.0 Section 5.1:</p>
+          <ul>
+            <li><code>sub</code>: Subject (Identifier for the End-User).</li>
+            <li><code>name</code>: Full name.</li>
+            <li><code>given_name</code>: First name.</li>
+            <li><code>email</code>: Email address.</li>
+            <li><code>email_verified</code>: Boolean indicating if email was verified.</li>
+            <li><code>phone_number</code>: Phone number.</li>
+            <li><code>picture</code>: URL of the End-User's profile picture.</li>
+            <li><code>locale</code>: User's locale (e.g., en-US).</li>
+          </ul>
+        </section>
+
+        <section id="signing">
+          <h2>RS256 vs HS256</h2>
+          <div style="display:flex; gap:1rem; margin-top:1rem;">
+            <div style="flex:1; border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>RS256 (Asymmetric)</strong><br>
+              Uses a private key to sign, and a public key to verify. The public key can be safely distributed (via JWKS). Highly recommended for production APIs.
+            </div>
+            <div style="flex:1; border:1px solid #ccc; padding:1rem; border-radius:4px;">
+              <strong>HS256 (Symmetric)</strong><br>
+              Uses the same shared secret to sign and verify. Requires distributing the secret to any service that needs to validate tokens. Dangerous for distributed APIs.
+            </div>
+          </div>
+        </section>
+
+        <section id="jwks">
+          <h2>JWKS (RFC 7517)</h2>
+          <p>The JSON Web Key Set is an endpoint that serves public keys used to verify RS256 token signatures.</p>
+          <pre><code>GET /.well-known/jwks.json HTTP/1.1</code></pre>
+          <pre><code>&#123;
+  "keys": [
+    &#123;
+      "kty": "RSA",
+      "alg": "RS256",
+      "use": "sig",
+      "kid": "123",
+      "n": "vX1...",
+      "e": "AQAB"
+    &#125;
+  ]
+&#125;</code></pre>
+          <ol>
+            <li>Read <code>kid</code> from JWT Header.</li>
+            <li>Fetch JWKS.</li>
+            <li>Find key matching <code>kid</code>.</li>
+            <li>Verify signature.</li>
+          </ol>
+        </section>
+
+        <section id="endpoints">
+          <h2>OAuth Endpoints</h2>
+          <ul>
+            <li><strong>/authorize</strong>: User login and consent.</li>
+            <li><strong>/token</strong>: Token exchange.</li>
+            <li><strong>/introspect</strong> (RFC 7662): Active validation. Returns boolean <code>active</code>.</li>
+            <li><strong>/revoke</strong> (RFC 7009): Invalidate a token before expiration.</li>
+          </ul>
+        </section>
+
+        <section id="lifetime">
+          <h2>Token Lifetime Strategy</h2>
+          <table style="width:100%; border-collapse:collapse; margin-top:1rem;">
+            <thead>
+              <tr style="border-bottom:2px solid #ccc; text-align:left;">
+                <th>Token Type</th>
+                <th>Recommended Lifetime</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #eee;"><td>Authorization Code</td><td>30 sec - 10 min</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td>ID Token</td><td>5 - 15 min</td></tr>
+              <tr style="border-bottom:1px solid #eee;"><td>Access Token</td><td>15 min - 1 hr</td></tr>
+              <tr><td>Refresh Token</td><td>1 - 90 days</td></tr>
+            </tbody>
+          </table>
+          <div class="callout warning">
+            <strong>Warning:</strong> Refresh Token Rotation is highly recommended. Each time a refresh token is used, issue a new one and invalidate the old one.
+          </div>
+        </section>
+
+        <footer class="page-footer">
+          <div class="prev-next">
+            <a href={base + '/oidc'}>&larr; Prev: OIDC</a>
+            <a href={base + '/labs'}>Next: Labs &rarr;</a>
+          </div>
+        </footer>
+      </main>
+    </div>
+  </div>
+</Layout>

@@ -38,7 +38,7 @@ const USERS_DB = [
 
 // ── PUBLIC ENDPOINT ───────────────────────────────────────────────────────────
 // No authentication required — anyone can call this
-app.get('/api/public', (req, res) => {
+app.get(['/api/public', '/api/public/health'], (req, res) => {
   res.json({
     status:    'online',
     message:   '⚡ AuthMatrix Public API — No authentication required',
@@ -144,7 +144,7 @@ app.post('/api/protected/users', requireAuth, requirePermission('write:users'), 
 // ── PROTECTED: Users — DELETE ─────────────────────────────────────────────────
 // Scope: delete:users (Admin only)
 app.delete('/api/protected/users/:id', requireAuth, requirePermission('delete:users'), (req: AuthenticatedRequest, res) => {
-  const id       = parseInt(req.params.id);
+  const id       = parseInt(String(req.params.id), 10);
   const idx      = USERS_DB.findIndex(u => u.id === id);
   const removed  = idx >= 0 ? USERS_DB.splice(idx, 1)[0] : null;
   res.json({
@@ -218,9 +218,15 @@ app.get('/api/gateway/protected-resource', apiGatewaySimulator, (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`⚡ [AuthMatrix API Server] running at http://localhost:${PORT}`);
-  console.log(`   Public:    GET  http://localhost:${PORT}/api/public`);
-  console.log(`   Protected: GET  http://localhost:${PORT}/api/protected/me  (requires Bearer token)`);
-  console.log(`   Mock JWT:  POST http://localhost:${PORT}/api/auth/mock-token { "role": "Admin" }`);
-});
+export { app };
+
+export let server: ReturnType<typeof app.listen> | null = null;
+
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(PORT, () => {
+    console.log(`⚡ [AuthMatrix API Server] running at http://localhost:${PORT}`);
+    console.log(`   Public:    GET  http://localhost:${PORT}/api/public`);
+    console.log(`   Protected: GET  http://localhost:${PORT}/api/protected/me  (requires Bearer token)`);
+    console.log(`   Mock JWT:  POST http://localhost:${PORT}/api/auth/mock-token { "role": "Admin" }`);
+  });
+}

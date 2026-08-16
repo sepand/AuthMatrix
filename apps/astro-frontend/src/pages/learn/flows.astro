@@ -201,14 +201,14 @@ grant_type=authorization_code
             <div class="step-label back-channel">Back Channel</div>
             <div class="step-num">Step 4</div>
             <h4>Token Response</h4>
-            <pre><code>{
+            <pre><code>&#123;
   "access_token":  "SlAV32hkKG",
   "token_type":    "Bearer",
   "expires_in":    3600,
   "refresh_token": "8xLOxBtZp8",
   "id_token":      "eyJhbGciOiJSUzI1NiJ9...",
   "scope":         "openid profile email"
-}</code></pre>
+&#125;</code></pre>
           </div>
 
           <div class="flow-step">
@@ -298,12 +298,12 @@ grant_type=client_credentials
 &scope=reports%3Aread%20jobs%3Aexecute</code></pre>
 
         <h4>Token Response</h4>
-        <pre><code>{
+        <pre><code>&#123;
   "access_token": "2YotnFZFEjr1zCsicMWpAA",
   "token_type":   "Bearer",
   "expires_in":   3600,
   "scope":        "reports:read jobs:execute"
-}</code></pre>
+&#125;</code></pre>
         <div class="callout warning">
           <strong>⚠️ No refresh token</strong>
           <p>Client Credentials tokens typically do not include a refresh token because the client can simply request a new access token at any time using its own credentials. Store the client_secret securely (secret manager — not hardcoded).</p>
@@ -383,13 +383,13 @@ grant_type=password
   &scope=profile email
 
 Response:
-{
+&#123;
   "device_code":      "GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS",
   "user_code":        "WDJB-MJHT",
   "verification_uri": "https://example.com/device",
   "expires_in":        1800,
   "interval":          5
-}</code></pre>
+&#125;</code></pre>
           </div>
           <div class="flow-step">
             <div class="step-num">Step 2</div>
@@ -426,12 +426,12 @@ Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
 grant_type=refresh_token
 &refresh_token=tGzv3JOkF0XG5Qx2TlKWIA</code></pre>
 
-        <pre><code>{
+        <pre><code>&#123;
   "access_token":  "new_access_token_value",
   "token_type":    "Bearer",
   "expires_in":    3600,
   "refresh_token": "new_refresh_token_value"
-}</code></pre>
+&#125;</code></pre>
 
         <table>
           <thead><tr><th></th><th>Access Token</th><th>Refresh Token</th></tr></thead>

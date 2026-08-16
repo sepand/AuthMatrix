@@ -1,0 +1,326 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout title="Lab 5 &mdash; API Testing with Postman" section="Labs">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <aside class="toc">
+        <span class="toc-label">In this lab</span>
+        <ul>
+          <li><a href="#import-the-collection">Import the Collection</a></li>
+          <li><a href="#strategy-1-local-mock-tokens">Strategy 1 &mdash; Local Mock Tokens</a></li>
+          <li><a href="#strategy-2-okta-oauth">Strategy 2 &mdash; Okta OAuth 2.0</a></li>
+          <li><a href="#strategy-3-entra-oauth">Strategy 3 &mdash; Microsoft Entra ID OAuth 2.0</a></li>
+          <li><a href="#switching-roles-in-postman">Switching Roles in Postman</a></li>
+          <li><a href="#reading-api-responses">Reading API Responses</a></li>
+          <li><a href="#checklist">Checklist</a></li>
+        </ul>
+        <hr class="toc-divider" />
+        <nav class="toc-nav">
+          <a href={base + '/labs'}>All Labs</a>
+          <a href={base + '/labs/lab-04'}>&larr; Previous Lab</a>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <div class="page-header">
+          <span class="badge badge-lab">Lab 5</span>
+          <h1>API Testing with Postman</h1>
+          <div class="lab-info-bar">
+            <div class="lab-info-item">
+              <span class="lab-info-label">Duration</span>
+              ~30 minutes
+            </div>
+            <div class="lab-info-item">
+              <span class="lab-info-label">Prerequisites</span>
+              Lab 1 complete, Postman installed
+            </div>
+          </div>
+        </div>
+
+        <div class="callout tip">
+          Test every AuthMatrix API endpoint across all four roles using three authentication strategies: <strong>Local mock tokens</strong>, <strong>Okta OAuth 2.0</strong>, and <strong>Microsoft Entra OAuth 2.0</strong>.
+        </div>
+        <hr />
+
+        <h2 id="import-the-collection">Import the Collection</h2>
+        <ol>
+          <li>Open Postman</li>
+          <li>Click <strong>Import</strong> (top left)</li>
+          <li>Drag and drop this file: <code>labs/lab-05-postman-api-testing/AuthMatrix.postman_collection.json</code></li>
+          <li>Click <strong>Import</strong></li>
+        </ol>
+        <p>You will see the <strong>AuthMatrix API Testing</strong> collection in the left sidebar with all folders and requests pre-built.</p>
+        <hr />
+
+        <h2 id="strategy-1-local-mock-tokens">Strategy 1 &mdash; Local Mock Tokens (No IdP Required)</h2>
+        <p>This is the fastest way to test all four roles. The API server issues signed JWTs on demand for any role.</p>
+
+        <h3>Step 1: Start the API server</h3>
+        <pre><code class="language-bash">npm run dev --workspace=apps/api-server</code></pre>
+
+        <h3>Step 2: Run the mock token requests</h3>
+        <p>Open the folder <strong>"&#128273; Step 0 &mdash; Get Mock Tokens"</strong> in the collection.</p>
+        <p>Run each of the four requests in order:</p>
+        <table>
+          <tr>
+            <th>Request</th>
+            <th>Role</th>
+            <th>What it does</th>
+          </tr>
+          <tr>
+            <td>Get Admin Token</td>
+            <td>Admin</td>
+            <td>Saves JWT to <code>token_admin</code> collection variable</td>
+          </tr>
+          <tr>
+            <td>Get Manager Token</td>
+            <td>Manager</td>
+            <td>Saves JWT to <code>token_manager</code></td>
+          </tr>
+          <tr>
+            <td>Get Developer Token</td>
+            <td>Developer</td>
+            <td>Saves JWT to <code>token_developer</code></td>
+          </tr>
+          <tr>
+            <td>Get Auditor Token</td>
+            <td>Auditor</td>
+            <td>Saves JWT to <code>token_auditor</code></td>
+          </tr>
+        </table>
+        <p>Each request automatically runs a <strong>test script</strong> that saves the token:</p>
+        <pre><code class="language-javascript"><span class="c">// Auto-runs after each mock-token response:</span>
+pm.collectionVariables.set('token_admin', data.token);</code></pre>
+
+        <h3>Step 3: Switch the active token by role</h3>
+        <p>The collection uses <code>&#123;&#123;active_token&#125;&#125;</code> as the active bearer token in all protected requests.</p>
+        <p>To test as a specific role, set <code>active_token</code> to the role's token in Collection Variables or directly in the Authorization tab.</p>
+
+        <h3>Step 4: Run requests and observe 200 vs 403</h3>
+        <p>Work through the folders:</p>
+
+        <h4>&#128202; Reports</h4>
+        <table>
+          <tr>
+            <th>Request</th>
+            <th>Admin</th>
+            <th>Manager</th>
+            <th>Developer</th>
+            <th>Auditor</th>
+          </tr>
+          <tr>
+            <td>GET /reports</td>
+            <td>&#9989; 200</td>
+            <td>&#9989; 200</td>
+            <td>&#9989; 200</td>
+            <td>&#9989; 200</td>
+          </tr>
+          <tr>
+            <td>POST /reports</td>
+            <td>&#9989; 200</td>
+            <td>&#9989; 200</td>
+            <td>&#10060; 403</td>
+            <td>&#10060; 403</td>
+          </tr>
+        </table>
+
+        <h4>&#128101; Users</h4>
+        <table>
+          <tr>
+            <th>Request</th>
+            <th>Admin</th>
+            <th>Manager</th>
+            <th>Developer</th>
+            <th>Auditor</th>
+          </tr>
+          <tr>
+            <td>GET /users</td>
+            <td>&#9989; 200</td>
+            <td>&#9989; 200</td>
+            <td>&#9989; 200</td>
+            <td>&#10060; 403</td>
+          </tr>
+          <tr>
+            <td>POST /users</td>
+            <td>&#9989; 200</td>
+            <td>&#10060; 403</td>
+            <td>&#10060; 403</td>
+            <td>&#10060; 403</td>
+          </tr>
+          <tr>
+            <td>DELETE /users/:id</td>
+            <td>&#9989; 200</td>
+            <td>&#10060; 403</td>
+            <td>&#10060; 403</td>
+            <td>&#10060; 403</td>
+          </tr>
+        </table>
+
+        <h4>&#9881;&#65039; Jobs</h4>
+        <table>
+          <tr>
+            <th>Request</th>
+            <th>Admin</th>
+            <th>Manager</th>
+            <th>Developer</th>
+            <th>Auditor</th>
+          </tr>
+          <tr>
+            <td>GET /jobs</td>
+            <td>&#9989; 200</td>
+            <td>&#10060; 403</td>
+            <td>&#9989; 200</td>
+            <td>&#10060; 403</td>
+          </tr>
+        </table>
+        <div class="callout tip">
+          <strong>&#128161; Zero Trust observation:</strong> Manager ranks above Developer for reports (Manager can write, Developer cannot), but Developer can execute jobs while Manager cannot. Roles are not hierarchical &mdash; they grant specific, least-privilege permissions.
+        </div>
+
+        <h4>&#128269; Audit</h4>
+        <table>
+          <tr>
+            <th>Request</th>
+            <th>Admin</th>
+            <th>Manager</th>
+            <th>Developer</th>
+            <th>Auditor</th>
+          </tr>
+          <tr>
+            <td>GET /audit</td>
+            <td>&#9989; 200</td>
+            <td>&#10060; 403</td>
+            <td>&#10060; 403</td>
+            <td>&#9989; 200</td>
+          </tr>
+          <tr>
+            <td>DELETE /audit</td>
+            <td>&#9989; 200</td>
+            <td>&#10060; 403</td>
+            <td>&#10060; 403</td>
+            <td>&#10060; 403</td>
+          </tr>
+        </table>
+        <div class="callout tip">
+          <strong>&#128113; Key Security Principle:</strong> The <strong>Auditor</strong> can read audit logs but <strong>cannot delete them</strong>. If Auditors could delete logs, they could cover up their own activity. This is enforced at the API level regardless of the page-level role check.
+        </div>
+
+        <h3>Step 5: Run the Attack Simulation folder</h3>
+        <p>Open <strong>"&#128683; Attack Simulation"</strong> and send each request. All should return 401 or 403.</p>
+        <hr />
+
+        <h2 id="strategy-2-okta-oauth">Strategy 2 &mdash; Okta OAuth 2.0 (Requires Lab 2 Complete)</h2>
+        <h3>Step 1: Open any protected request in Postman</h3>
+        <p>For example, open <strong>"GET /api/protected/me"</strong> from the collection.</p>
+
+        <h3>Step 2: Click the Authorization tab</h3>
+        <p>In the request panel, click <strong>Authorization</strong>.</p>
+
+        <h3>Step 3: Configure OAuth 2.0</h3>
+        <p>Set <strong>Auth Type</strong> to <code>OAuth 2.0</code>. Then click <strong>Get New Access Token</strong> and fill in the details with your Okta configuration.</p>
+        <div class="callout warning">
+          <strong>&#9888;&#65039; Important:</strong> You must add Postman's callback URL (<code>https://oauth.pstmn.io/v1/callback</code>) to Okta first.
+        </div>
+
+        <h3>Step 4: Get the token</h3>
+        <p>Click <strong>Get New Access Token</strong>. A browser popup opens to Okta's login page. Log in with your Okta credentials. Postman captures the callback and exchanges the code automatically.</p>
+
+        <h3>Step 5: Send the request</h3>
+        <p>Click <strong>Send</strong>. The request goes to the API server with <code>Authorization: Bearer &lt;okta_access_token&gt;</code>.</p>
+        <div class="callout note">
+          <strong>&#8505;&#65039; Note:</strong> The Okta access token is an RS256 JWT. The API server's current <code>auth.ts</code> validates HS256 (local) tokens. For full Okta token validation directly by the API (without APIM in the middle), the <code>auth.ts</code> middleware needs JWKS mode &mdash; this is covered in <strong>Lab 4</strong>.
+        </div>
+
+        <h3>Step 6: Verify the token in Postman</h3>
+        <p>In the <strong>"Tests"</strong> tab for any request, add:</p>
+        <pre><code class="language-javascript">var token = pm.request.headers.get('Authorization').replace('Bearer ', '');
+var payload = JSON.parse(atob(token.split('.')&#91;1&#93;));
+console.log('Okta claims:', JSON.stringify(payload, null, 2));
+console.log('Groups:', payload.groups);</code></pre>
+        <p>Run the request. In the Postman <strong>Console</strong>, you will see the Okta token's raw claims including <code>groups: ["Admin", "Everyone"]</code>.</p>
+        <hr />
+
+        <h2 id="strategy-3-entra-oauth">Strategy 3 &mdash; Microsoft Entra ID OAuth 2.0 (Requires Lab 3 Complete)</h2>
+        <h3>Step 1: Add Postman callback URL to Entra</h3>
+        <p>Add <code>https://oauth.pstmn.io/v1/callback</code> to your App Registration's Web Redirect URIs.</p>
+
+        <h3>Step 2: Configure OAuth 2.0 in Postman</h3>
+        <p>Open any protected request &rarr; <strong>Authorization</strong> &rarr; Auth Type: <code>OAuth 2.0</code> &rarr; <strong>Get New Access Token</strong> using your Entra configuration.</p>
+
+        <h3>Step 3: Get the token</h3>
+        <p>Click <strong>Get New Access Token</strong> and sign in.</p>
+
+        <h3>Step 4: Inspect the Entra token claims</h3>
+        <p>In Postman Console:</p>
+        <pre><code class="language-javascript">var token = pm.request.headers.get('Authorization').replace('Bearer ', '');
+var payload = JSON.parse(atob(token.split('.')&#91;1&#93;));
+console.log('Entra claims:', JSON.stringify(payload, null, 2));
+console.log('Roles:', payload.roles);</code></pre>
+        <p>You will see <code>roles: ["Admin"]</code> &mdash; the Entra App Role claim. Notice the difference from Okta: <code>roles</code> (Entra) vs <code>groups</code> (Okta).</p>
+        <hr />
+
+        <h2 id="switching-roles-in-postman">Switching Roles in Postman</h2>
+        <h3>Local tokens: edit the <code>active_token</code> collection variable</h3>
+        <p>Quick role switching without re-running mock-token requests: change the value of <code>active_token</code>.</p>
+        <h3>Okta: different Okta users per role</h3>
+        <p>Each Okta user must be in the correct Okta Group (Lab 2).</p>
+        <h3>Entra: change App Role assignment</h3>
+        <p>Each Entra user must be assigned the correct App Role (Lab 3).</p>
+        <hr />
+
+        <h2 id="reading-api-responses">Reading API Responses</h2>
+        <p><strong>Success (200/201):</strong></p>
+        <pre><code class="language-json">&#123;
+  "message": "&#9989; Access granted to Reports (read:reports)",
+  "reports": &#91;...&#93;,
+  "requestedBy": "Admin User"
+&#125;</code></pre>
+
+        <p><strong>Forbidden (403):</strong></p>
+        <pre><code class="language-json">&#123;
+  "error": "Forbidden",
+  "message": "Insufficient permissions. Required: write:reports. Your permissions: read:users, read:reports, execute:jobs"
+&#125;</code></pre>
+
+        <p><strong>Unauthorized (401):</strong></p>
+        <pre><code class="language-json">&#123;
+  "error": "Unauthorized",
+  "message": "No token provided"
+&#125;</code></pre>
+        <hr />
+
+        <h2 id="checklist">&#9989; Lab 5 Checklist</h2>
+        <ul>
+          <li>Postman collection imported</li>
+          <li>API server running on port 4000</li>
+          <li>Ran all 4 mock-token requests &mdash; collection variables populated</li>
+          <li>Tested GET /reports as each of the 4 roles</li>
+          <li>Confirmed Developer gets 403 on POST /reports</li>
+          <li>Confirmed Auditor gets 403 on DELETE /audit</li>
+          <li>Confirmed Manager gets 403 on GET /jobs (even though Manager &gt; Developer on reports)</li>
+          <li>Ran all Attack Simulation requests &mdash; all returned 401 or 403</li>
+          <li>(Optional) Configured Okta OAuth 2.0 in Postman and got real RS256 token</li>
+          <li>(Optional) Compared Okta <code>groups</code> claim vs Entra <code>roles</code> claim in Postman Console</li>
+        </ul>
+
+        <div class="page-footer">
+          <div class="prev-next">
+            <a href={base + '/labs/lab-04'} class="prev"><span class="prev-next-label">Previous</span>Lab 4</a>
+            <div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.lab-info-bar { display:flex; gap:1.5rem; flex-wrap:wrap; margin:1rem 0 2rem; padding:1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+.lab-info-item { font-size:0.875rem; } 
+.lab-info-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); display:block; margin-bottom:0.2rem; }
+.step-block { border-left:2px solid var(--border); padding-left:1.25rem; margin-bottom:2rem; }
+.step-block h3 { color:var(--primary); }
+</style>

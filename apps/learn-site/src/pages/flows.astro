@@ -1,0 +1,205 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout section="Grant Types">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <nav class="toc">
+        <div class="toc-label">On this page</div>
+        <ul>
+          <li><a href="#decision">Grant Type Decision Table</a></li>
+          <li><a href="#auth-code">Authorization Code Flow</a></li>
+          <li><a href="#pkce">PKCE Extension</a></li>
+          <li><a href="#client-creds">Client Credentials Flow</a></li>
+          <li><a href="#implicit">Implicit Flow (Deprecated)</a></li>
+          <li><a href="#device">Device Authorization Flow</a></li>
+          <li><a href="#refresh">Refresh Tokens</a></li>
+        </ul>
+      </nav>
+
+      <main class="content">
+        <header class="page-header">
+          <h1>OAuth 2.0 Grant Types</h1>
+          <span class="badge badge-intermediate">Intermediate</span>
+        </header>
+
+        <section id="decision">
+          <h2>Grant Type Decision Table</h2>
+          <table style="width:100%; border-collapse:collapse; margin-bottom:1rem;">
+            <thead>
+              <tr style="border-bottom:2px solid #ccc; text-align:left;">
+                <th>App Type</th>
+                <th>Client Type</th>
+                <th>Grant Type</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #eee;">
+                <td>Server-side web app</td>
+                <td>Confidential</td>
+                <td>Authorization Code</td>
+                <td>Back-channel exchange</td>
+              </tr>
+              <tr style="border-bottom:1px solid #eee;">
+                <td>SPA (React/Vue)</td>
+                <td>Public</td>
+                <td>Auth Code + PKCE</td>
+                <td>No client secret</td>
+              </tr>
+              <tr style="border-bottom:1px solid #eee;">
+                <td>Mobile / Native</td>
+                <td>Public</td>
+                <td>Auth Code + PKCE</td>
+                <td>Binary can be decompiled</td>
+              </tr>
+              <tr style="border-bottom:1px solid #eee;">
+                <td>Microservice/Daemon</td>
+                <td>Confidential</td>
+                <td>Client Credentials</td>
+                <td>No user involved</td>
+              </tr>
+              <tr style="border-bottom:1px solid #eee;">
+                <td>IoT / Smart TV</td>
+                <td>Public</td>
+                <td>Device Authorization</td>
+                <td>No keyboard</td>
+              </tr>
+              <tr>
+                <td>(Deprecated)</td>
+                <td>-</td>
+                <td>Resource Owner Password</td>
+                <td>Avoid</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="auth-code">
+          <h2>Authorization Code Flow</h2>
+          <p>Defined in RFC 6749 Section 4.1. This is the most common and secure flow for apps that involve a user.</p>
+          
+          <div style="margin-top:1rem;">
+            <div style="border-left:4px solid #f1c40f; padding-left:1rem; margin-bottom:1rem;">
+              <strong>Step 1: Authorization Request (Front Channel)</strong><br>
+              <pre><code>GET /authorize?response_type=code
+&amp;client_id=s6BhdRkqt3
+&amp;state=xyz
+&amp;redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb</code></pre>
+            </div>
+            
+            <div style="border-left:4px solid #f1c40f; padding-left:1rem; margin-bottom:1rem;">
+              <strong>Step 2: Authorization Response (Front Channel)</strong><br>
+              <pre><code>HTTP/1.1 302 Found
+Location: https://client.example.com/cb?code=SplxlOBeZQQYbYS6WxSbIA
+&amp;state=xyz</code></pre>
+            </div>
+
+            <div style="border-left:4px solid #2ecc71; padding-left:1rem; margin-bottom:1rem;">
+              <strong>Step 3: Token Request (Back Channel)</strong><br>
+              <pre><code>POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
+
+grant_type=authorization_code&amp;code=SplxlOBeZQQYbYS6WxSbIA
+&amp;redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb</code></pre>
+            </div>
+
+            <div style="border-left:4px solid #2ecc71; padding-left:1rem; margin-bottom:1rem;">
+              <strong>Step 4: Token Response (Back Channel)</strong><br>
+              <pre><code>HTTP/1.1 200 OK
+Content-Type: application/json
+
+&#123;
+  "access_token":"2YotnFZFEjr1zCsicMWpAA",
+  "token_type":"bearer",
+  "expires_in":3600,
+  "refresh_token":"tGzv3JOkF0XG5Qx2TlKWIA"
+&#125;</code></pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="pkce">
+          <h2>PKCE Extension (RFC 7636)</h2>
+          <p>Proof Key for Code Exchange (PKCE) protects the Authorization Code flow from interception attacks.</p>
+          <ol>
+            <li>Generate a random string called <code>code_verifier</code>.</li>
+            <li>Compute the <code>code_challenge</code>: <code>BASE64URL(SHA256(code_verifier))</code>.</li>
+            <li>Send the <code>code_challenge</code> and <code>code_challenge_method=S256</code> in the <code>/authorize</code> request.</li>
+            <li>Send the original <code>code_verifier</code> in the <code>/token</code> request. The server verifies the hash matches.</li>
+          </ol>
+        </section>
+
+        <section id="client-creds">
+          <h2>Client Credentials Flow</h2>
+          <p>RFC 6749 Section 4.4. Used for machine-to-machine communication where there is no user context.</p>
+          <pre><code>POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
+
+grant_type=client_credentials</code></pre>
+        </section>
+
+        <section id="implicit">
+          <h2>Implicit Flow (Deprecated)</h2>
+          <div class="callout warning">
+            <strong>Warning:</strong> Deprecated in OAuth 2.1. Do not use.
+          </div>
+          <p>The implicit flow (<code>response_type=token</code>) returned tokens directly in the URL fragment. It suffered from token leakage in browser history, lack of CSRF protection, and could not issue refresh tokens.</p>
+        </section>
+
+        <section id="device">
+          <h2>Device Authorization Flow</h2>
+          <p>RFC 8628. For devices without a browser or keyboard (e.g., Smart TVs).</p>
+          <ol>
+            <li>Device requests a code from the Authorization Server.</li>
+            <li>Server returns a <code>user_code</code> and a <code>verification_uri</code>.</li>
+            <li>Device displays the URI and code to the user. User completes login on their phone.</li>
+            <li>Device polls the token endpoint until the user finishes.</li>
+          </ol>
+        </section>
+
+        <section id="refresh">
+          <h2>Refresh Tokens</h2>
+          <p>RFC 6749 Section 6. Refresh tokens are used to obtain new access tokens without requiring the user to log in again.</p>
+          <table style="width:100%; border-collapse:collapse; margin-top:1rem;">
+            <thead>
+              <tr style="border-bottom:2px solid #ccc; text-align:left;">
+                <th>Feature</th>
+                <th>Access Token</th>
+                <th>Refresh Token</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #eee;">
+                <td>Sent to APIs</td>
+                <td>Yes</td>
+                <td>No (Never)</td>
+              </tr>
+              <tr style="border-bottom:1px solid #eee;">
+                <td>Sent to /token</td>
+                <td>No</td>
+                <td>Yes</td>
+              </tr>
+              <tr>
+                <td>Lifetime</td>
+                <td>Short (e.g., 15 mins)</td>
+                <td>Long (e.g., 30 days)</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <footer class="page-footer">
+          <div class="prev-next">
+            <a href={base + '/oauth'}>&larr; Prev: OAuth 2.0</a>
+            <a href={base + '/oidc'}>Next: OIDC &rarr;</a>
+          </div>
+        </footer>
+      </main>
+    </div>
+  </div>
+</Layout>

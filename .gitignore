@@ -19,3 +19,8 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+
+# Agent scratch directories
+.agents/*
+!.agents/rules/
+

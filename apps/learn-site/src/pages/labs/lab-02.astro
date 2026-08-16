@@ -1,0 +1,421 @@
+---
+import Layout from '../../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout title="Lab 2 &mdash; Okta OIDC Authentication" section="Labs">
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <aside class="toc">
+        <span class="toc-label">In this lab</span>
+        <ul>
+          <li><a href="#what-happens">What Happens End-to-End</a></li>
+          <li><a href="#part-a">Part A &mdash; Okta Developer Tenant Setup</a></li>
+          <li><a href="#part-b">Part B &mdash; Create the OIDC Application in Okta</a></li>
+          <li><a href="#part-c">Part C &mdash; Configure the Groups Claim</a></li>
+          <li><a href="#part-d">Part D &mdash; Create Okta Groups and Assign Users</a></li>
+          <li><a href="#part-e">Part E &mdash; Configure Your Local Environment</a></li>
+          <li><a href="#part-f">Part F &mdash; Test Okta Sign-In</a></li>
+          <li><a href="#part-g">Part G &mdash; Test Role-Based Access</a></li>
+          <li><a href="#part-h">Part H &mdash; Token Inspection</a></li>
+          <li><a href="#checklist">Validation Checklist</a></li>
+        </ul>
+        <hr class="toc-divider" />
+        <nav class="toc-nav">
+          <a href={base + '/labs'}>All Labs</a>
+          <a href={base + '/labs/lab-01'}>&larr; Previous Lab</a>
+          <a href={base + '/labs/lab-03'}>Next Lab &rarr;</a>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <div class="page-header">
+          <span class="badge badge-lab">Lab 2</span>
+          <h1>Okta OIDC Authentication</h1>
+          <div class="lab-info-bar">
+            <div class="lab-info-item">
+              <span class="lab-info-label">Duration</span>
+              ~45 minutes
+            </div>
+            <div class="lab-info-item">
+              <span class="lab-info-label">Prerequisites</span>
+              Lab 1 complete &middot; Active Okta Developer account (developer.okta.com)
+            </div>
+          </div>
+        </div>
+
+        <div class="callout tip">
+          <strong>&#128113; Zero Trust Principle:</strong> Verify Explicitly &mdash; every sign-in triggers a cryptographically signed token from Okta, validated server-side via JWKS before any session is granted.
+        </div>
+
+        <p><strong>What you will build:</strong> A real Okta OIDC sign-in flow &mdash; browser &rarr; Okta &rarr; PKCE code exchange &rarr; RS256 token validation &rarr; role-mapped session.</p>
+        <hr />
+
+        <h2 id="what-happens">What Happens End-to-End</h2>
+        <pre><code>Browser                 Astro Server              Okta
+   │                        │                       │
+   │── Click "Sign in" ───► │                       │
+   │                        │── Build /authorize ──►│
+   │◄── Redirect to Okta ───│   (PKCE + state)      │
+   │                        │                       │
+   │── Login at Okta ──────────────────────────────►│
+   │◄── Redirect /callback?code=... ────────────────│
+   │                        │                       │
+   │── GET /callback ──────►│                       │
+   │                        │── POST /token ────────►│
+   │                        │◄─ id_token + access_token
+   │                        │                       │
+   │                        │── Fetch JWKS ─────────►│
+   │                        │◄─ Public Keys          │
+   │                        │                       │
+   │                        │   Verify RS256 sig     │
+   │                        │   Extract groups[]     │
+   │                        │   Map groups → roles   │
+   │                        │   Create session JWT   │
+   │◄── Set cookie ─────────│                       │
+   │── GET /dashboard ─────►│                       │</code></pre>
+        <hr />
+
+        <h2 id="part-a">Part A &mdash; Okta Developer Tenant Setup</h2>
+        <h3>Step 1: Create a free Okta Developer account</h3>
+        <ol>
+          <li>Go to <strong>https://developer.okta.com/signup/</strong></li>
+          <li>Fill in your name, email, and company</li>
+          <li>Click <strong>Sign up</strong></li>
+          <li>Check your email &mdash; click the activation link</li>
+          <li>Set your password</li>
+        </ol>
+        <div class="callout note">
+          <strong>&#8505;&#65039; Note:</strong> Your Okta domain will be something like <code>dev-12345678.okta.com</code>. Keep this handy.
+        </div>
+
+        <h3>Step 2: Log in to your Okta Admin Console</h3>
+        <p>URL: <strong>https://dev-XXXXXX-admin.okta.com</strong> (with <code>-admin</code> in the URL)</p>
+        <p>You should see the Okta Admin Dashboard.</p>
+        <hr />
+
+        <h2 id="part-b">Part B &mdash; Create the OIDC Application in Okta</h2>
+        <h3>Step 3: Navigate to Applications</h3>
+        <ol>
+          <li>In the left sidebar, click <strong>Applications</strong></li>
+          <li>Click <strong>Applications</strong> again (the sub-item)</li>
+          <li>Click the blue <strong>Create App Integration</strong> button</li>
+        </ol>
+
+        <h3>Step 4: Select the application type</h3>
+        <p>A dialog box appears:</p>
+        <ol>
+          <li>Under <strong>Sign-in method</strong>, select <strong>OIDC &mdash; OpenID Connect</strong></li>
+          <li>Under <strong>Application type</strong>, select <strong>Web Application</strong></li>
+          <li>Click <strong>Next</strong></li>
+        </ol>
+
+        <h3>Step 5: Configure the app settings</h3>
+        <p>Fill in the form:</p>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+          </tr>
+          <tr>
+            <td><strong>App integration name</strong></td>
+            <td><code>AuthMatrix Lab</code></td>
+          </tr>
+          <tr>
+            <td><strong>Grant types</strong></td>
+            <td>&#9989; Authorization Code (already checked)</td>
+          </tr>
+          <tr>
+            <td><strong>Sign-in redirect URIs</strong></td>
+            <td><code>http://localhost:3000/api/auth/okta-callback</code></td>
+          </tr>
+          <tr>
+            <td><strong>Sign-out redirect URIs</strong></td>
+            <td><code>http://localhost:3000</code></td>
+          </tr>
+          <tr>
+            <td><strong>Controlled access</strong></td>
+            <td>Select <strong>Allow everyone in your organization to access</strong></td>
+          </tr>
+        </table>
+        <p>Click <strong>Save</strong>.</p>
+
+        <h3>Step 6: Record your credentials</h3>
+        <p>After saving, you land on the app's <strong>General</strong> tab. You need:</p>
+        <table>
+          <tr>
+            <th>Value</th>
+            <th>Where to find it</th>
+          </tr>
+          <tr>
+            <td><strong>Client ID</strong></td>
+            <td>Listed on the General tab as "Client ID"</td>
+          </tr>
+          <tr>
+            <td><strong>Client Secret</strong></td>
+            <td>Click <strong>Edit</strong> &rarr; scroll to "CLIENT SECRETS" section</td>
+          </tr>
+          <tr>
+            <td><strong>Okta Domain</strong></td>
+            <td>Top-right of the Admin Console (e.g., <code>dev-12345678.okta.com</code>)</td>
+          </tr>
+        </table>
+        <div class="callout warning">
+          <strong>&#9888;&#65039; Security:</strong> Never commit your Client Secret to git. It goes in your local <code>.env</code> file only.
+        </div>
+        <hr />
+
+        <h2 id="part-c">Part C &mdash; Configure the Groups Claim</h2>
+        <p>Okta's OIDC tokens do not include group membership by default. You must add a <strong>custom claim</strong> to include <code>groups</code>.</p>
+
+        <h3>Step 7: Navigate to the Authorization Server</h3>
+        <ol>
+          <li>In the left sidebar, click <strong>Security</strong></li>
+          <li>Click <strong>API</strong></li>
+          <li>Under <strong>Authorization Servers</strong>, click <strong>default</strong></li>
+        </ol>
+
+        <h3>Step 8: Add the groups claim</h3>
+        <ol>
+          <li>Click the <strong>Claims</strong> tab</li>
+          <li>Click <strong>Add Claim</strong></li>
+          <li>Fill in the form:</li>
+        </ol>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+          </tr>
+          <tr>
+            <td><strong>Name</strong></td>
+            <td><code>groups</code></td>
+          </tr>
+          <tr>
+            <td><strong>Include in token type</strong></td>
+            <td>Access Token &middot; Always</td>
+          </tr>
+          <tr>
+            <td><strong>Value type</strong></td>
+            <td>Groups</td>
+          </tr>
+          <tr>
+            <td><strong>Filter</strong></td>
+            <td>Matches regex: <code>.*</code></td>
+          </tr>
+          <tr>
+            <td><strong>Include in</strong></td>
+            <td>Any scope</td>
+          </tr>
+        </table>
+        <p>Click <strong>Create</strong>.</p>
+        <div class="callout note">
+          <strong>&#128161; Tip:</strong> The regex <code>.*</code> includes ALL groups. In production, filter to specific groups only.
+        </div>
+
+        <h3>Step 9: Verify the issuer</h3>
+        <p>Still on the Authorization Server page, note the <strong>Issuer</strong> field at the top. It will look like:</p>
+        <pre><code>https://dev-XXXXXX.okta.com/oauth2/default</code></pre>
+        <p>Copy this &mdash; it is your <code>OKTA_ISSUER</code>.</p>
+        <hr />
+
+        <h2 id="part-d">Part D &mdash; Create Okta Groups and Assign Users</h2>
+        <h3>Step 10: Create the AuthMatrix groups</h3>
+        <ol>
+          <li>In the left sidebar, click <strong>Directory</strong> &rarr; <strong>Groups</strong></li>
+          <li>Click <strong>Add Group</strong> and create each group:</li>
+        </ol>
+        <table>
+          <tr>
+            <th>Group Name</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td><code>Admin</code></td>
+            <td>AuthMatrix Administrators</td>
+          </tr>
+          <tr>
+            <td><code>Managers</code></td>
+            <td>AuthMatrix Managers</td>
+          </tr>
+          <tr>
+            <td><code>Developers</code></td>
+            <td>AuthMatrix Developers</td>
+          </tr>
+          <tr>
+            <td><code>Auditors</code></td>
+            <td>AuthMatrix Auditors</td>
+          </tr>
+        </table>
+        <p>Create all four groups by repeating the <strong>Add Group</strong> action.</p>
+
+        <h3>Step 11: Assign your user to a group</h3>
+        <ol>
+          <li>Click on the <strong>Admin</strong> group you just created</li>
+          <li>Click the <strong>People</strong> tab</li>
+          <li>Click <strong>Assign People</strong></li>
+          <li>Search for your user account name</li>
+          <li>Click the <strong>+</strong> icon next to your name</li>
+          <li>Click <strong>Save</strong></li>
+        </ol>
+        <div class="callout note">
+          <strong>&#128204; How the mapping works:</strong> When you log in, Okta includes <code>"groups": ["Admin", "Everyone"]</code> in the access token. The AuthMatrix app maps <code>"Admin"</code> &rarr; internal <code>Admin</code> role with all permissions.
+        </div>
+        <hr />
+
+        <h2 id="part-e">Part E &mdash; Configure Your Local Environment</h2>
+        <h3>Step 12: Update your <code>.env</code> file</h3>
+        <p>Open <code>c:\GitHub\Learn IDM\.env</code> in a text editor. Fill in the Okta section:</p>
+        <pre><code class="language-env"><span class="c"># &mdash;&mdash; OKTA DEVELOPER SETTINGS &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</span>
+OKTA_ISSUER=https://dev-XXXXXX.okta.com/oauth2/default
+OKTA_CLIENT_ID=0oaXXXXXXXXXXXXXXXX
+OKTA_CLIENT_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+OKTA_REDIRECT_URI=http://localhost:3000/api/auth/okta-callback</code></pre>
+        <p>Replace the <code>XXXXXX</code> values with your actual values from Step 6 and Step 9.</p>
+
+        <h3>Step 13: Restart the Astro server</h3>
+        <p>Stop the Astro dev server (Ctrl+C) and restart it so it picks up the new <code>.env</code>:</p>
+        <pre><code class="language-bash">npm run dev --workspace=apps/astro-frontend</code></pre>
+        <hr />
+
+        <h2 id="part-f">Part F &mdash; Test Okta Sign-In</h2>
+        <h3>Step 14: Open the login page</h3>
+        <p>Navigate to: <strong>http://localhost:3000/login</strong></p>
+        <p>The Okta button should now show:</p>
+        <pre><code>&#128309; Sign in with Okta
+&#9989; Configured</code></pre>
+        <div class="callout note">
+          If it still shows "&#9888;&#65039; Set OKTA_ISSUER..." &mdash; the server hasn't picked up your <code>.env</code>. Make sure you restarted it and the file is named <code>.env</code> (not <code>.env.txt</code>).
+        </div>
+
+        <h3>Step 15: Click "Sign in with Okta"</h3>
+        <p>What happens:</p>
+        <ol>
+          <li>The browser hits <code>/api/auth/okta-login</code> on the Astro server</li>
+          <li>The server generates a PKCE <code>code_verifier</code> and <code>code_challenge</code></li>
+          <li>Sets two short-lived HttpOnly cookies: <code>okta_pkce_verifier</code> and <code>okta_oauth_state</code></li>
+          <li><strong>Redirects your browser to Okta</strong></li>
+        </ol>
+        <p>You should now see the <strong>Okta login page</strong>.</p>
+
+        <h3>Step 16: Authenticate at Okta</h3>
+        <ol>
+          <li>Enter your <strong>Okta account email and password</strong></li>
+          <li>Complete MFA if prompted</li>
+          <li>Click <strong>Sign In</strong></li>
+        </ol>
+        <p>Okta redirects your browser back to:</p>
+        <pre><code>http://localhost:3000/api/auth/okta-callback?code=XXXXXXXX&amp;state=YYYYYYYY</code></pre>
+
+        <h3>Step 17: Observe the callback processing</h3>
+        <p>The Astro server's <code>okta-callback.ts</code> runs:</p>
+        <ol>
+          <li>&#9989; Validates <code>state</code> cookie matches URL parameter (CSRF check)</li>
+          <li>&#9989; POSTs to <code>https://dev-XXXXX.okta.com/oauth2/default/v1/token</code> with the authorization code and <code>code_verifier</code></li>
+          <li>&#9989; Receives <code>id_token</code> (RS256 signed JWT)</li>
+          <li>&#9989; Fetches Okta's JWKS from <code>https://dev-XXXXX.okta.com/oauth2/default/v1/keys</code></li>
+          <li>&#9989; Verifies the RS256 signature cryptographically</li>
+          <li>&#9989; Extracts <code>groups[]</code> claim &rarr; maps to internal roles</li>
+          <li>&#9989; Creates session JWT &rarr; sets <code>auth_token</code> HttpOnly cookie</li>
+          <li>&#9989; Redirects to <code>/dashboard</code></li>
+        </ol>
+
+        <h3>Step 18: Verify on the Dashboard</h3>
+        <p>On the dashboard you should see:</p>
+        <ul>
+          <li><strong>Identity Provider badge:</strong> &#128309; <strong>Okta</strong></li>
+          <li><strong>Subject (sub):</strong> <code>00u...</code> &mdash; Okta's user ID (format: <code>00u</code> + alphanumeric)</li>
+          <li><strong>Email:</strong> Your Okta account email</li>
+          <li><strong>Issuer (iss):</strong> <code>https://authmatrix.local</code> (our normalized internal issuer)</li>
+          <li><strong>Assigned Roles:</strong> The group you assigned yourself to (e.g., <code>Admin</code>)</li>
+          <li><strong>Granted Permissions:</strong> The permissions for that role</li>
+        </ul>
+        <div class="callout note">
+          <strong>&#128161; Tip:</strong> Notice the issuer is <code>https://authmatrix.local</code> &mdash; not <code>dev-XXXXX.okta.com</code>. This is by design: the session token is our own normalized JWT, not the raw Okta token. The Okta token is validated and discarded server-side.
+        </div>
+        <hr />
+
+        <h2 id="part-g">Part G &mdash; Test Role-Based Access</h2>
+        <h3>Step 19: Test API endpoints</h3>
+        <p>On the Dashboard, click the API Endpoint Tester buttons. Since you logged in as <strong>Admin</strong> (from the Okta group you set up), all endpoints should return <code>200</code>.</p>
+
+        <h3>Step 20: Test with a different group (optional)</h3>
+        <ol>
+          <li>Log out</li>
+          <li>In Okta Admin &rarr; Directory &rarr; Groups, add yourself to <code>Developers</code> group instead</li>
+          <li>Remove yourself from <code>Admin</code> group</li>
+          <li>Sign back in with Okta</li>
+          <li>Dashboard should show role <code>Developer</code> with only <code>read:reports</code>, <code>execute:jobs</code> permissions</li>
+          <li>Clicking <code>POST /users</code> or <code>DELETE /audit</code> should return <strong>403</strong></li>
+        </ol>
+        <hr />
+
+        <h2 id="part-h">Part H &mdash; Token Inspection</h2>
+        <h3>Step 21: Inspect the JWT in the dashboard</h3>
+        <p>On the Dashboard JWT Inspector panel:</p>
+        <p><strong>HEADER should show:</strong></p>
+        <pre><code class="language-json">&#123;
+  "alg": "HS256",
+  "typ": "JWT"
+&#125;</code></pre>
+        <div class="callout note">
+          Why HS256? The <strong>session token</strong> stored in the cookie is our internal JWT signed with <code>JWT_SECRET</code>. The original Okta token (RS256) was validated server-side and converted to our normalized session format.
+        </div>
+        <p><strong>PAYLOAD should show:</strong></p>
+        <pre><code class="language-json">&#123;
+  "sub": "00uXXXXXXXXXXXXXXXX",
+  "name": "Your Name",
+  "email": "you@yourcompany.com",
+  "roles": &#91;"Admin"&#93;,
+  "permissions": &#91;"read:users", "write:users", ...&#93;,
+  "idp": "okta",
+  "iss": "https://authmatrix.local",
+  "aud": "https://api.authmatrix.local"
+&#125;</code></pre>
+
+        <h3>Step 22: Inspect the original Okta token (Advanced)</h3>
+        <p>To see the raw RS256 token Okta issued, open browser DevTools during the sign-in:</p>
+        <ol>
+          <li>Open DevTools &rarr; <strong>Network</strong> tab</li>
+          <li>Sign in with Okta</li>
+          <li>In the Network tab, look for the request to <code>/api/auth/okta-callback</code></li>
+          <li>The <code>okta_pkce_verifier</code> cookie is visible in the Request Headers before it's deleted</li>
+        </ol>
+        <p>Alternatively, add a temporary <code>console.log(tokens.id_token)</code> to <code>okta-callback.ts</code>, restart the server, sign in, and check the Astro server console output. Copy the token and paste it into https://jwt.io to see the raw Okta claims including <code>groups[]</code>.</p>
+        <hr />
+
+        <h2 id="checklist">&#9989; Lab 2 Complete &mdash; Validation Checklist</h2>
+        <ul>
+          <li>Created Okta Developer account and Admin Console access</li>
+          <li>Created OIDC Web Application in Okta with correct redirect URI</li>
+          <li>Added <code>groups</code> claim to the <code>default</code> Authorization Server</li>
+          <li>Created 4 Okta groups (Admin, Managers, Developers, Auditors)</li>
+          <li>Assigned yourself to the Admin group</li>
+          <li>Filled in <code>.env</code> with correct <code>OKTA_ISSUER</code>, <code>OKTA_CLIENT_ID</code>, <code>OKTA_CLIENT_SECRET</code></li>
+          <li>Login page shows "&#9989; Configured" for Okta</li>
+          <li>Clicked "Sign in with Okta" &rarr; redirected to Okta login page</li>
+          <li>Authenticated at Okta &rarr; returned to dashboard</li>
+          <li>Dashboard shows &#128309; Okta badge and correct email/role/permissions</li>
+          <li>API endpoint tests show expected 200/403 responses per role</li>
+          <li>JWT Inspector shows <code>"idp": "okta"</code> in payload</li>
+        </ul>
+        <p><strong>Next:</strong> <a href={base + '/labs/lab-03'}>Lab 3 &mdash; Microsoft Entra ID OIDC</a></p>
+        <p><strong>Or skip to:</strong> <a href={base + '/labs/lab-04'}>Lab 4 &mdash; Azure APIM API Gateway</a></p>
+
+        <div class="page-footer">
+          <div class="prev-next">
+            <a href={base + '/labs/lab-01'} class="prev"><span class="prev-next-label">Previous</span>Lab 1</a>
+            <a href={base + '/labs/lab-03'} class="next"><span class="prev-next-label">Next</span>Lab 3</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.lab-info-bar { display:flex; gap:1.5rem; flex-wrap:wrap; margin:1rem 0 2rem; padding:1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+.lab-info-item { font-size:0.875rem; } 
+.lab-info-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); display:block; margin-bottom:0.2rem; }
+.step-block { border-left:2px solid var(--border); padding-left:1.25rem; margin-bottom:2rem; }
+.step-block h3 { color:var(--primary); }
+</style>
