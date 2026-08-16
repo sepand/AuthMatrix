@@ -1,0 +1,581 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="OAuth 2.0 Grant Types & Flows | AuthMatrix Learn">
+  <div class="learn-page">
+    <aside class="learn-sidebar">
+      <p class="sidebar-label">In this article</p>
+      <ul>
+        <li><a href="#grant-types">1. What is a Grant Type?</a></li>
+        <li><a href="#decision-guide">2. Which Flow Should I Use?</a></li>
+        <li><a href="#auth-code">3. Authorization Code Flow ⭐</a></li>
+        <li><a href="#pkce">4. PKCE Extension</a></li>
+        <li><a href="#client-credentials">5. Client Credentials Flow</a></li>
+        <li><a href="#implicit">6. Implicit Flow (Deprecated)</a></li>
+        <li><a href="#password">7. Resource Owner Password Flow</a></li>
+        <li><a href="#device">8. Device Authorization Flow</a></li>
+        <li><a href="#refresh">9. Refresh Tokens</a></li>
+        <li><a href="#web-security">10. Web Security 101</a></li>
+      </ul>
+      <div class="sidebar-nav">
+        <a href="/learn/oauth">&larr; OAuth 2.0</a>
+        <a href="/learn/oidc">OIDC &rarr;</a>
+      </div>
+    </aside>
+
+    <div class="learn-content">
+      <div class="page-header">
+        <span class="badge">Intermediate · 30 min</span>
+        <h1>OAuth 2.0 Grant Types &amp; Flows</h1>
+        <p class="lead">Every OAuth flow is a different answer to the same question: <em>how does the client prove it is authorized to receive an access token?</em> The right answer depends on what kind of application you are building.</p>
+      </div>
+
+      <!-- ── 1. GRANT TYPES ──────────────────────────────────────────────── -->
+      <section id="grant-types">
+        <h2>1. What is a Grant Type?</h2>
+        <!-- Source: RFC 6749 Section 1.3 -->
+        <p>In OAuth 2.0, a <strong>grant type</strong> describes the method by which a client obtains authorization from the resource owner and ultimately receives an access token. RFC 6749 Section 1.3 defines this as the "authorization grant" — the credential representing the resource owner's authorization.</p>
+        <p>Choosing the wrong grant type can introduce serious security vulnerabilities. Each flow has been designed for a specific trust model and application architecture.</p>
+        <div class="callout note">
+          <strong>OAuth 2.1 Update</strong>
+          <p>The draft OAuth 2.1 specification consolidates OAuth 2.0 by formally deprecating the Implicit flow and the Resource Owner Password flow, and mandating PKCE for all Authorization Code flows. Modern implementations should follow these updated guidelines.</p>
+        </div>
+      </section>
+
+      <!-- ── 2. DECISION GUIDE ───────────────────────────────────────────── -->
+      <section id="decision-guide">
+        <h2>2. Which Flow Should I Use?</h2>
+        <p>Use this table to select the right grant type for your application:</p>
+        <table>
+          <thead>
+            <tr><th>App Type</th><th>Client Type</th><th>Grant Type</th><th>Key Reason</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Server-side web app (Node, Java, Python)</td>
+              <td>Confidential</td>
+              <td><strong>Authorization Code</strong></td>
+              <td>Secure back-channel code exchange; can keep client_secret</td>
+            </tr>
+            <tr>
+              <td>Single Page App (React, Vue, Angular)</td>
+              <td>Public</td>
+              <td><strong>Auth Code + PKCE</strong></td>
+              <td>No client_secret; PKCE protects against code interception</td>
+            </tr>
+            <tr>
+              <td>Mobile / Native App</td>
+              <td>Public</td>
+              <td><strong>Auth Code + PKCE</strong></td>
+              <td>Binary is decompilable; PKCE replaces the secret</td>
+            </tr>
+            <tr>
+              <td>Microservice / Daemon / CLI</td>
+              <td>Confidential</td>
+              <td><strong>Client Credentials</strong></td>
+              <td>No user interaction; app acts on its own behalf</td>
+            </tr>
+            <tr>
+              <td>Smart TV / IoT device / CLI tool</td>
+              <td>Public</td>
+              <td><strong>Device Authorization</strong></td>
+              <td>Limited/no keyboard input; user authorizes on secondary device</td>
+            </tr>
+            <tr>
+              <td>Legacy migration only</td>
+              <td>Confidential</td>
+              <td><strike>Resource Owner Password</strike></td>
+              <td>Deprecated. Avoid unless migrating legacy systems.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="flow-tabs">
+          <div class="tabs-header">
+            <button class="tab-btn active" data-tab="app-types">By App Type</button>
+            <button class="tab-btn" data-tab="trust-model">By Trust Model</button>
+          </div>
+          <div class="tab-content active" id="tab-app-types">
+            <div class="app-type-grid">
+              <div class="app-card" data-flow="auth-code-pkce">
+                <div class="app-icon">🌐</div>
+                <h4>Single Page App</h4>
+                <p>JavaScript runs in the browser. No secrets possible.</p>
+                <div class="app-flow">Auth Code + PKCE</div>
+              </div>
+              <div class="app-card" data-flow="auth-code">
+                <div class="app-icon">🖥️</div>
+                <h4>Server-Side Web App</h4>
+                <p>Code runs on your server. Client secret is safe.</p>
+                <div class="app-flow">Authorization Code</div>
+              </div>
+              <div class="app-card" data-flow="auth-code-pkce">
+                <div class="app-icon">📱</div>
+                <h4>Mobile App</h4>
+                <p>Binary can be decompiled. No embedded secrets.</p>
+                <div class="app-flow">Auth Code + PKCE</div>
+              </div>
+              <div class="app-card" data-flow="client-credentials">
+                <div class="app-icon">⚙️</div>
+                <h4>Microservice / API</h4>
+                <p>No user involved. Machine-to-machine trust.</p>
+                <div class="app-flow">Client Credentials</div>
+              </div>
+            </div>
+          </div>
+          <div class="tab-content" id="tab-trust-model">
+            <p style="color: var(--text-muted); padding: 1rem 0;">High-trust (first-party apps where you own both client and server) may use Client Credentials or Resource Owner Password (legacy). Low-trust (third-party apps) should always use Authorization Code + PKCE to give the user explicit consent visibility.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 3. AUTHORIZATION CODE FLOW ─────────────────────────────────── -->
+      <section id="auth-code">
+        <h2>3. Authorization Code Flow ⭐ The Gold Standard</h2>
+        <p>The Authorization Code flow is the most secure and widely recommended OAuth flow. It uses <strong>two separate exchanges</strong>: a front-channel redirect to get a short-lived code, then a back-channel server-to-server POST to exchange the code for tokens.</p>
+        <!-- Source: RFC 6749 Section 4.1 -->
+        <p><em>Source: RFC 6749 Section 4.1</em></p>
+
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-label front-channel">Front Channel</div>
+            <div class="step-num">Step 1</div>
+            <h4>Authorization Request</h4>
+            <p>The client redirects the user's browser to the Authorization Server's <code>/authorize</code> endpoint:</p>
+            <pre><code>GET /authorize HTTP/1.1
+Host: authorization-server.example.com
+
+?response_type=code
+&client_id=s6BhdRkqt3
+&redirect_uri=https%3A%2F%2Fclient.example.com%2Fcb
+&scope=openid%20profile%20email
+&state=af0ifjsldkj</code></pre>
+            <div class="param-table">
+              <div class="param"><code>response_type=code</code><span>Tells the server we want an Authorization Code (not a token directly)</span></div>
+              <div class="param"><code>client_id</code><span>Public identifier of the registered application</span></div>
+              <div class="param"><code>redirect_uri</code><span>Where to send the user after authorization (must be pre-registered)</span></div>
+              <div class="param"><code>scope</code><span>Permissions being requested</span></div>
+              <div class="param"><code>state</code><span>Random CSRF token — must be verified on callback</span></div>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-label front-channel">Front Channel</div>
+            <div class="step-num">Step 2</div>
+            <h4>Authorization Response (Code Issued)</h4>
+            <p>User authenticates and consents. The Authorization Server redirects back to the client with a short-lived, single-use authorization code:</p>
+            <pre><code>HTTP/1.1 302 Found
+Location: https://client.example.com/cb
+  ?code=SplxlOBeZQQYbYS6WxSbIA
+  &state=af0ifjsldkj</code></pre>
+            <div class="callout warning" style="margin-top: 1rem;">
+              <strong>⚠️ The code is not the token</strong>
+              <p>The authorization code is a temporary, single-use credential. It has a very short lifetime (typically 60 seconds to 10 minutes). It must be exchanged for a token via the back channel immediately. Logging or caching it is a security risk.</p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-label back-channel">Back Channel</div>
+            <div class="step-num">Step 3</div>
+            <h4>Token Request (Code Exchange)</h4>
+            <p>The client server makes a direct POST to the Token endpoint — this never touches the browser:</p>
+            <pre><code>POST /token HTTP/1.1
+Host: authorization-server.example.com
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
+
+grant_type=authorization_code
+&code=SplxlOBeZQQYbYS6WxSbIA
+&redirect_uri=https%3A%2F%2Fclient.example.com%2Fcb
+&client_id=s6BhdRkqt3</code></pre>
+            <div class="param-table">
+              <div class="param"><code>grant_type=authorization_code</code><span>Identifies this as a code exchange</span></div>
+              <div class="param"><code>code</code><span>The code received in the redirect</span></div>
+              <div class="param"><code>redirect_uri</code><span>Must match exactly what was sent in Step 1</span></div>
+              <div class="param"><code>Authorization: Basic ...</code><span>Client authenticates with client_id:client_secret (confidential clients)</span></div>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-label back-channel">Back Channel</div>
+            <div class="step-num">Step 4</div>
+            <h4>Token Response</h4>
+            <pre><code>{
+  "access_token":  "SlAV32hkKG",
+  "token_type":    "Bearer",
+  "expires_in":    3600,
+  "refresh_token": "8xLOxBtZp8",
+  "id_token":      "eyJhbGciOiJSUzI1NiJ9...",
+  "scope":         "openid profile email"
+}</code></pre>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-label resource">Resource Access</div>
+            <div class="step-num">Step 5</div>
+            <h4>API Call with Bearer Token</h4>
+            <pre><code>GET /api/protected/me HTTP/1.1
+Host: api.example.com
+Authorization: Bearer SlAV32hkKG</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 4. PKCE ─────────────────────────────────────────────────────── -->
+      <section id="pkce">
+        <h2>4. PKCE — Proof Key for Code Exchange</h2>
+        <!-- Source: RFC 7636 -->
+        <p>PKCE (pronounced "pixy") was introduced in <strong>RFC 7636</strong> to protect public clients against authorization code interception attacks. On mobile and desktop, it is possible for a malicious app to register itself as a handler for a redirect URI scheme and steal the authorization code. PKCE prevents this even if the code is stolen, because the attacker cannot also provide the original <code>code_verifier</code>.</p>
+
+        <h3>How PKCE Works</h3>
+        <div class="pkce-steps">
+          <div class="pkce-step">
+            <div class="pkce-num">①</div>
+            <div>
+              <h4>Generate a code_verifier</h4>
+              <p>The client generates a cryptographically random string of 43-128 URL-safe characters:</p>
+              <pre><code>// Example: 43-128 chars, [A-Z a-z 0-9 - . _ ~]
+code_verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"</code></pre>
+            </div>
+          </div>
+          <div class="pkce-step">
+            <div class="pkce-num">②</div>
+            <div>
+              <h4>Compute the code_challenge</h4>
+              <p>The challenge is the Base64URL encoding of the SHA-256 hash of the verifier:</p>
+              <pre><code>code_challenge = BASE64URL(SHA256(ASCII(code_verifier)))
+// Example output:
+code_challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"</code></pre>
+            </div>
+          </div>
+          <div class="pkce-step">
+            <div class="pkce-num">③</div>
+            <div>
+              <h4>Include challenge in Authorization Request</h4>
+              <pre><code>GET /authorize
+  ?response_type=code
+  &client_id=s6BhdRkqt3
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256
+  &redirect_uri=...
+  &state=...</code></pre>
+            </div>
+          </div>
+          <div class="pkce-step">
+            <div class="pkce-num">④</div>
+            <div>
+              <h4>Include verifier in Token Request</h4>
+              <pre><code>POST /token
+  grant_type=authorization_code
+  &code=SplxlOBeZQQYbYS6WxSbIA
+  &code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+  &redirect_uri=...</code></pre>
+              <p>The Authorization Server computes <code>SHA256(code_verifier)</code> and verifies it matches the <code>code_challenge</code> stored from Step 3. If an attacker stole the code but doesn't have the verifier — token issuance fails. ✅</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 5. CLIENT CREDENTIALS ──────────────────────────────────────── -->
+      <section id="client-credentials">
+        <h2>5. Client Credentials Flow</h2>
+        <!-- Source: RFC 6749 Section 4.4 -->
+        <p>Used for <strong>machine-to-machine (M2M)</strong> scenarios where there is no user. The client authenticates directly as itself. <em>Source: RFC 6749 Section 4.4</em></p>
+
+        <div class="callout note">
+          <strong>When to use</strong>
+          <p>Microservices calling other microservices, background jobs, CLI tools performing automated tasks, and any server-to-server integration where no end-user is involved.</p>
+        </div>
+
+        <h4>Token Request</h4>
+        <pre><code>POST /token HTTP/1.1
+Host: authorization-server.example.com
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
+
+grant_type=client_credentials
+&scope=reports%3Aread%20jobs%3Aexecute</code></pre>
+
+        <h4>Token Response</h4>
+        <pre><code>{
+  "access_token": "2YotnFZFEjr1zCsicMWpAA",
+  "token_type":   "Bearer",
+  "expires_in":   3600,
+  "scope":        "reports:read jobs:execute"
+}</code></pre>
+        <div class="callout warning">
+          <strong>⚠️ No refresh token</strong>
+          <p>Client Credentials tokens typically do not include a refresh token because the client can simply request a new access token at any time using its own credentials. Store the client_secret securely (secret manager — not hardcoded).</p>
+        </div>
+      </section>
+
+      <!-- ── 6. IMPLICIT (DEPRECATED) ───────────────────────────────────── -->
+      <section id="implicit">
+        <h2>6. Implicit Flow — Deprecated ⚠️</h2>
+        <!-- Source: RFC 6749 Section 4.2 -->
+        <p>The Implicit Flow was designed for browser-based (JavaScript) applications before PKCE existed. Instead of receiving a code and exchanging it, the client receives the access token <strong>directly in the URL fragment</strong> after redirect.</p>
+
+        <pre><code>GET /authorize
+  ?response_type=token        ← returns token directly (not code)
+  &client_id=s6BhdRkqt3
+  &redirect_uri=https://app.example.com/callback
+  &scope=openid profile
+
+↓ Server redirects:
+
+Location: https://app.example.com/callback
+  #access_token=SlAV32hkKG
+  &token_type=Bearer
+  &expires_in=3600</code></pre>
+
+        <div class="callout danger">
+          <strong>🚨 Why Implicit Flow is Deprecated</strong>
+          <ul>
+            <li><strong>Token in URL:</strong> Appears in browser history, server logs, and <code>Referer</code> headers on subsequent requests — all visible to third parties</li>
+            <li><strong>Token injection:</strong> No <code>state</code> binding between token and the original request</li>
+            <li><strong>No refresh tokens:</strong> When the access token expires, the user must re-authenticate</li>
+            <li><strong>No client authentication:</strong> Any app can claim any <code>client_id</code></li>
+          </ul>
+          <strong>Use Auth Code + PKCE instead for all browser-based and mobile apps.</strong>
+        </div>
+      </section>
+
+      <!-- ── 7. PASSWORD GRANT ───────────────────────────────────────────── -->
+      <section id="password">
+        <h2>7. Resource Owner Password Flow — Legacy</h2>
+        <!-- Source: RFC 6749 Section 4.3 -->
+        <p>The Resource Owner Password Credentials grant allows the client to collect the user's username and password directly and exchange them for an access token. <em>Source: RFC 6749 Section 4.3</em></p>
+
+        <pre><code>POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password
+&username=johndoe
+&password=A3ddj3w
+&scope=openid%20profile</code></pre>
+
+        <div class="callout danger">
+          <strong>🚨 Why This Flow Should Be Avoided</strong>
+          <ul>
+            <li>Re-introduces the password anti-pattern OAuth was designed to eliminate</li>
+            <li>The client sees the user's password — defeating the purpose of delegated authorization</li>
+            <li>Cannot support MFA, CAPTCHA, or any challenge-response authentication</li>
+            <li>Cannot support social login (no IdP redirect)</li>
+            <li><strong>Formally deprecated in the draft OAuth 2.1 specification</strong></li>
+          </ul>
+          <p><strong>Only acceptable use:</strong> Migrating legacy systems that cannot implement redirect-based flows yet. Plan to replace it.</p>
+        </div>
+      </section>
+
+      <!-- ── 8. DEVICE FLOW ─────────────────────────────────────────────── -->
+      <section id="device">
+        <h2>8. Device Authorization Flow</h2>
+        <!-- Source: RFC 8628 -->
+        <p>Designed for devices with limited input capability — smart TVs, game consoles, CLI tools, IoT devices. The device displays a short code and a URL. The user visits that URL on a different device (phone or laptop) to authorize. <em>Source: RFC 8628</em></p>
+
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-num">Step 1</div>
+            <h4>Device requests a user code</h4>
+            <pre><code>POST /device_authorization
+  &client_id=s6BhdRkqt3
+  &scope=profile email
+
+Response:
+{
+  "device_code":      "GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS",
+  "user_code":        "WDJB-MJHT",
+  "verification_uri": "https://example.com/device",
+  "expires_in":        1800,
+  "interval":          5
+}</code></pre>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">Step 2</div>
+            <h4>Device displays the code to the user</h4>
+            <div class="device-display">
+              <p>Visit <strong>example.com/device</strong></p>
+              <div class="user-code">WDJB-MJHT</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">Step 3</div>
+            <h4>Device polls for token</h4>
+            <pre><code>POST /token
+  grant_type=urn:ietf:params:oauth:grant-type:device_code
+  &device_code=GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS
+  &client_id=s6BhdRkqt3
+
+// Polling until user completes auth on secondary device
+// Returns: authorization_pending, slow_down, or tokens</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 9. REFRESH TOKENS ───────────────────────────────────────────── -->
+      <section id="refresh">
+        <h2>9. Refresh Tokens</h2>
+        <!-- Source: RFC 6749 Section 6 -->
+        <p>An access token has a short lifetime. When it expires, the client uses a <strong>refresh token</strong> to obtain a new access token without requiring the user to re-authenticate. <em>Source: RFC 6749 Section 6</em></p>
+
+        <pre><code>POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
+
+grant_type=refresh_token
+&refresh_token=tGzv3JOkF0XG5Qx2TlKWIA</code></pre>
+
+        <pre><code>{
+  "access_token":  "new_access_token_value",
+  "token_type":    "Bearer",
+  "expires_in":    3600,
+  "refresh_token": "new_refresh_token_value"
+}</code></pre>
+
+        <table>
+          <thead><tr><th></th><th>Access Token</th><th>Refresh Token</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Lifetime</strong></td><td>Short (15 min – 1 hour)</td><td>Long (days – weeks)</td></tr>
+            <tr><td><strong>Sent to</strong></td><td>Resource Server (API)</td><td>Authorization Server only</td></tr>
+            <tr><td><strong>Purpose</strong></td><td>Authorize API calls</td><td>Obtain new access tokens</td></tr>
+            <tr><td><strong>Revocable</strong></td><td>Yes (via /revoke)</td><td>Yes — invalidates entire session</td></tr>
+            <tr><td><strong>Storage</strong></td><td>In-memory (short-lived)</td><td>Secure, encrypted storage</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ── 10. WEB SECURITY 101 ────────────────────────────────────────── -->
+      <section id="web-security">
+        <h2>10. Web Security 101 Guidelines</h2>
+        <p>These rules apply to every OAuth implementation regardless of which flow you choose:</p>
+        <div class="security-checklist">
+          <label class="check-item">
+            <input type="checkbox"> <span>Always use the <code>state</code> parameter with a CSRF token to ensure flow integrity</span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>Always whitelist redirect URIs — exact match, no wildcards</span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>Bind the same client to authorization grants and token requests using <code>client_id</code></span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>For confidential clients: never leak the client_secret outside your server</span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>For public clients: use PKCE instead of a client_secret</span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>Use short-lived access tokens (preferably under 1 hour)</span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>Validate the <code>state</code> parameter on every callback before processing the code</span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>Use HTTPS for all endpoints — no exceptions in production</span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>Verify the authorization code was issued to the same <code>redirect_uri</code> in the token request</span>
+          </label>
+          <label class="check-item">
+            <input type="checkbox"> <span>JWTs help because any tampering invalidates the cryptographic signature</span>
+          </label>
+        </div>
+      </section>
+
+      <footer class="page-references">
+        <h3>Sources &amp; References</h3>
+        <ul>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc6749" target="_blank">RFC 6749 — OAuth 2.0 Authorization Framework</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc7636" target="_blank">RFC 7636 — PKCE (Proof Key for Code Exchange)</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc8628" target="_blank">RFC 8628 — Device Authorization Grant</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc9700" target="_blank">RFC 9700 — OAuth 2.0 Security Best Current Practice</a></li>
+        </ul>
+        <div class="page-nav">
+          <a href="/learn/oauth">&larr; OAuth 2.0 Fundamentals</a>
+          <a href="/learn/oidc">OpenID Connect &rarr;</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .page-header { margin-bottom: 3rem; }
+  .badge { display: inline-block; background: rgba(56,189,248,0.15); color: var(--primary); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .lead { font-size: 1.15rem; color: var(--text-muted); max-width: 680px; }
+  .sidebar-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 700; margin-bottom: 0.75rem; }
+  .sidebar-nav { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .sidebar-nav a { color: var(--primary); text-decoration: none; font-size: 0.9rem; }
+
+  /* Flow steps */
+  .flow-steps { display: flex; flex-direction: column; gap: 0; margin: 1.5rem 0; position: relative; }
+  .flow-steps::before { content: ''; position: absolute; left: 1.5rem; top: 2rem; bottom: 2rem; width: 2px; background: var(--surface-border); }
+  .flow-step { padding: 1.5rem 1.5rem 1.5rem 4rem; position: relative; background: var(--surface); margin-bottom: 0.75rem; border-radius: 8px; border: 1px solid var(--surface-border); }
+  .step-num { position: absolute; left: 1rem; top: 1.5rem; width: 2rem; height: 2rem; background: var(--primary); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; }
+  .step-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 0.5rem; display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; }
+  .step-label.front-channel { background: rgba(251,191,36,0.2); color: #fbbf24; }
+  .step-label.back-channel { background: rgba(52,211,153,0.2); color: var(--success); }
+  .step-label.resource { background: rgba(56,189,248,0.2); color: var(--primary); }
+  .flow-step h4 { margin: 0.5rem 0; }
+  .flow-step p { margin-bottom: 0.75rem; color: var(--text-muted); font-size: 0.95rem; }
+
+  /* Param table */
+  .param-table { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .param { display: flex; gap: 1rem; align-items: baseline; padding: 0.5rem; background: var(--bg); border-radius: 4px; font-size: 0.85rem; }
+  .param code { flex-shrink: 0; }
+  .param span { color: var(--text-muted); }
+
+  /* PKCE */
+  .pkce-steps { display: flex; flex-direction: column; gap: 1rem; margin: 1.5rem 0; counter-reset: pkce; }
+  .pkce-step { display: flex; gap: 1.25rem; padding: 1.25rem; background: var(--surface); border-radius: 8px; border: 1px solid var(--surface-border); }
+  .pkce-num { font-size: 1.5rem; flex-shrink: 0; }
+  .pkce-step h4 { margin: 0 0 0.5rem; }
+  .pkce-step p { margin: 0.5rem 0; color: var(--text-muted); font-size: 0.9rem; }
+
+  /* Tabs */
+  .flow-tabs { margin: 1.5rem 0; border: 1px solid var(--surface-border); border-radius: 8px; overflow: hidden; }
+  .tabs-header { display: flex; border-bottom: 1px solid var(--surface-border); }
+  .tab-btn { flex: 1; padding: 0.75rem 1rem; background: var(--surface); color: var(--text-muted); border: none; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+  .tab-btn.active { background: var(--bg); color: var(--primary); font-weight: 600; }
+  .tab-content { display: none; padding: 1.5rem; }
+  .tab-content.active { display: block; }
+  .app-type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+  .app-card { padding: 1.25rem; background: var(--surface); border: 1px solid var(--surface-border); border-radius: 8px; text-align: center; }
+  .app-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .app-card h4 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+  .app-card p { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 0.75rem; }
+  .app-flow { font-size: 0.75rem; font-weight: 700; color: var(--primary); background: rgba(56,189,248,0.1); padding: 0.25rem 0.5rem; border-radius: 4px; }
+
+  /* Device display */
+  .device-display { background: #1a1a2e; border: 2px solid var(--surface-border); border-radius: 8px; padding: 1.5rem; text-align: center; margin: 1rem 0; }
+  .user-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.2em; color: var(--primary); font-family: monospace; margin-top: 0.5rem; }
+
+  /* Security checklist */
+  .security-checklist { display: flex; flex-direction: column; gap: 0.75rem; }
+  .check-item { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.75rem; background: var(--surface); border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+  .check-item input { margin-top: 0.15rem; accent-color: var(--success); flex-shrink: 0; }
+  .check-item:has(input:checked) { background: rgba(52,211,153,0.08); }
+
+  .page-references { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--surface-border); }
+  .page-references h3 { margin-bottom: 1rem; }
+  .page-references ul { list-style: none; padding: 0; }
+  .page-references li { margin-bottom: 0.5rem; }
+  .page-references a { color: var(--primary); text-decoration: none; }
+  .page-references a:hover { text-decoration: underline; }
+  .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; }
+  .page-nav a { color: var(--primary); text-decoration: none; font-weight: 600; }
+</style>
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + tab)?.classList.add('active');
+    });
+  });
+</script>

@@ -1,0 +1,205 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Learning Hub | AuthMatrix">
+  <div class="learn-hub">
+    <section class="hero">
+      <h1>Identity & Access Management Masterclass</h1>
+      <p>Master OAuth 2.0, OpenID Connect, and enterprise identity standards.</p>
+    </section>
+
+    <section class="prerequisites">
+      <h2>Prerequisites</h2>
+      <p>Basic understanding of HTTP, APIs, and web development.</p>
+    </section>
+
+    <section class="quick-reference">
+      <h2>Quick Reference</h2>
+      <div class="card-grid">
+        <div class="ref-card">
+          <h3>AuthN vs AuthZ</h3>
+          <p><strong>Authentication (AuthN):</strong> Proving <em>who</em> you are.</p>
+          <p><strong>Authorization (AuthZ):</strong> Proving <em>what</em> you can do.</p>
+        </div>
+        <div class="ref-card">
+          <h3>OAuth vs OIDC</h3>
+          <p><strong>OAuth 2.0:</strong> Delegated authorization framework.</p>
+          <p><strong>OIDC:</strong> Identity layer on top of OAuth 2.0.</p>
+        </div>
+        <div class="ref-card">
+          <h3>Access Token vs ID Token</h3>
+          <p><strong>Access Token:</strong> For the Resource Server to authorize API calls.</p>
+          <p><strong>ID Token:</strong> For the Client to authenticate the user.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="curriculum">
+      <h2>Curriculum</h2>
+      <div class="curriculum-grid">
+        <a href="/learn/oauth" class="topic-card">
+          <h3>1. OAuth 2.0 Deep Dive</h3>
+          <p>Understand the framework, actors, scopes, and why API keys aren't enough.</p>
+          <div class="meta">
+            <span class="time">⏱️ 20 min</span>
+            <span class="diff beginner">Beginner</span>
+          </div>
+        </a>
+        <a href="/learn/flows" class="topic-card">
+          <h3>2. Grant Types & Flows</h3>
+          <p>Master the Auth Code flow, PKCE, Client Credentials, and which one to pick.</p>
+          <div class="meta">
+            <span class="time">⏱️ 30 min</span>
+            <span class="diff intermediate">Intermediate</span>
+          </div>
+        </a>
+        <a href="/learn/oidc" class="topic-card">
+          <h3>3. OpenID Connect (OIDC)</h3>
+          <p>Solve the pseudo-authentication problem. ID tokens, discovery, and scopes.</p>
+          <div class="meta">
+            <span class="time">⏱️ 25 min</span>
+            <span class="diff intermediate">Intermediate</span>
+          </div>
+        </a>
+        <a href="/learn/tokens" class="topic-card">
+          <h3>4. Tokens, JWT & Claims</h3>
+          <p>Deep dive into JWT structure, JWKS, token endpoints, and lifetimes.</p>
+          <div class="meta">
+            <span class="time">⏱️ 25 min</span>
+            <span class="diff advanced">Advanced</span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <footer class="references">
+      <h3>Primary Sources</h3>
+      <ul>
+        <li><a href="https://datatracker.ietf.org/doc/html/rfc6749" target="_blank">RFC 6749 (OAuth 2.0)</a></li>
+        <li><a href="https://datatracker.ietf.org/doc/html/rfc7636" target="_blank">RFC 7636 (PKCE)</a></li>
+        <li><a href="https://datatracker.ietf.org/doc/html/rfc7519" target="_blank">RFC 7519 (JWT)</a></li>
+        <li><a href="https://openid.net/specs/openid-connect-core-1_0.html" target="_blank">OIDC Core 1.0</a></li>
+        <li><a href="https://datatracker.ietf.org/doc/html/rfc9700" target="_blank">OAuth 2.0 Security BCP</a></li>
+      </ul>
+    </footer>
+  </div>
+</Layout>
+
+<style>
+  .learn-hub {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem 0;
+  }
+  .hero {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+  .hero h1 {
+    font-size: 2.5rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+  }
+  .hero p {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+  }
+  section {
+    margin-bottom: 4rem;
+  }
+  h2 {
+    font-size: 1.75rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--surface-border);
+    padding-bottom: 0.5rem;
+  }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+  }
+  .ref-card {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    padding: 1.5rem;
+    border-radius: 8px;
+  }
+  .ref-card h3 {
+    color: var(--primary);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+  .ref-card p {
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  .curriculum-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+  .topic-card {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text);
+    transition: transform 0.2s, border-color 0.2s;
+    display: flex;
+    flex-direction: column;
+  }
+  .topic-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
+  }
+  .topic-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+  }
+  .topic-card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+    flex-grow: 1;
+  }
+  .meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .diff {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .beginner { background: rgba(52, 211, 153, 0.15); color: var(--success); }
+  .intermediate { background: rgba(251, 191, 36, 0.15); color: var(--warning); }
+  .advanced { background: rgba(248, 113, 113, 0.15); color: var(--danger); }
+  .references {
+    border-top: 1px solid var(--surface-border);
+    padding-top: 2rem;
+  }
+  .references h3 {
+    margin-bottom: 1rem;
+  }
+  .references ul {
+    list-style: none;
+    padding: 0;
+  }
+  .references li {
+    margin-bottom: 0.5rem;
+  }
+  .references a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+  .references a:hover {
+    text-decoration: underline;
+  }
+</style>

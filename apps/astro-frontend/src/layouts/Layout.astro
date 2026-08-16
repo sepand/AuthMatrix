@@ -29,6 +29,7 @@ const user = Astro.locals.user;
         </a>
         <nav class="nav-links">
           <a href="/">Overview</a>
+          <a href="/learn">Learn</a>
           <a href="/dashboard">Dashboard</a>
           <a href="/dashboard/reports">Reports</a>
           <a href="/dashboard/audit">Audit</a>
@@ -205,4 +206,217 @@ const user = Astro.locals.user;
     color: var(--text-muted);
     font-size: 0.85rem;
   }
+
+  /* Learn Layout Shared Styles */
+  .learn-page {
+    display: flex;
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .learn-sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 100px;
+    height: calc(100vh - 120px);
+    overflow-y: auto;
+    border-right: 1px solid var(--surface-border);
+    padding-right: 1rem;
+  }
+
+  .learn-sidebar ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .learn-sidebar li {
+    margin-bottom: 0.5rem;
+  }
+
+  .learn-sidebar a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: block;
+    padding: 0.25rem 0;
+    transition: color 0.2s;
+  }
+
+  .learn-sidebar a:hover {
+    color: var(--primary);
+  }
+
+  .learn-content {
+    flex: 1;
+    min-width: 0;
+    padding-bottom: 4rem;
+    scroll-behavior: smooth;
+  }
+
+  .learn-content h1, .learn-content h2, .learn-content h3 {
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--text);
+  }
+
+  .learn-content h1 {
+    font-size: 2.5rem;
+    color: var(--primary);
+    margin-top: 0;
+    border-bottom: 1px solid var(--surface-border);
+    padding-bottom: 1rem;
+  }
+
+  .learn-content h2 {
+    font-size: 1.75rem;
+    border-bottom: 1px solid var(--surface-border);
+    padding-bottom: 0.5rem;
+    scroll-margin-top: 80px;
+  }
+
+  .learn-content p {
+    margin-bottom: 1.5rem;
+  }
+
+  .learn-content ul {
+    margin-bottom: 1.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .learn-content li {
+    margin-bottom: 0.5rem;
+  }
+
+  /* Code Blocks */
+  .learn-content pre {
+    background: #070c14;
+    padding: 1.5rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid var(--surface-border);
+    margin-bottom: 1.5rem;
+    font-family: var(--font-code);
+    font-size: 0.9rem;
+    position: relative;
+  }
+
+  .learn-content code {
+    font-family: var(--font-code);
+    color: var(--primary);
+    background: rgba(56, 189, 248, 0.1);
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+
+  .learn-content pre code {
+    background: transparent;
+    padding: 0;
+    color: #e2e8f0;
+  }
+
+  /* Syntax Highlighting overrides */
+  .code-http-method { color: var(--primary); font-weight: bold; }
+  .code-http-url { color: var(--success); }
+  .code-http-header { color: var(--text-muted); }
+  .code-json-key { color: var(--primary); }
+  .code-json-string { color: var(--success); }
+  .code-json-number { color: #f59e0b; }
+
+  /* Callouts */
+  .callout {
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid;
+    background: var(--surface);
+  }
+
+  .callout.note { border-color: var(--primary); background: rgba(56, 189, 248, 0.1); }
+  .callout.warning { border-color: #fbbf24; background: rgba(251, 191, 36, 0.1); }
+  .callout.danger { border-color: var(--danger); background: rgba(248, 113, 113, 0.1); }
+  .callout.tip { border-color: var(--success); background: rgba(52, 211, 153, 0.1); }
+  
+  .callout strong { display: block; margin-bottom: 0.25rem; font-size: 1.05rem; }
+
+  /* Flow Diagram */
+  .diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    margin: 2rem 0;
+    padding: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+  }
+  
+  .diagram-row {
+    display: flex;
+    justify-content: center;
+    gap: 4rem;
+    width: 100%;
+  }
+
+  .actor-box {
+    background: var(--bg);
+    border: 2px solid var(--primary);
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    min-width: 160px;
+  }
+  
+  .actor-box.alt { border-color: var(--success); }
+  .actor-box.accent { border-color: var(--accent); }
+
+  .diagram-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    flex: 1;
+    position: relative;
+  }
+
+  .diagram-arrow::before {
+    content: '';
+    height: 2px;
+    background: var(--surface-border);
+    width: 100%;
+    position: absolute;
+    top: 50%;
+    z-index: 0;
+  }
+  
+  .diagram-arrow span {
+    background: var(--surface);
+    padding: 0 0.5rem;
+    z-index: 1;
+  }
+
+  /* Tables */
+  .learn-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5rem;
+  }
+  .learn-content th, .learn-content td {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--surface-border);
+    text-align: left;
+  }
+  .learn-content th {
+    background: var(--surface);
+    font-weight: 600;
+  }
+
+  html { scroll-behavior: smooth; }
 </style>

@@ -1,0 +1,632 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Tokens, JWT & Claims | AuthMatrix Learn">
+  <div class="learn-page">
+    <aside class="learn-sidebar">
+      <p class="sidebar-label">In this article</p>
+      <ul>
+        <li><a href="#three-tokens">1. The Three Token Types</a></li>
+        <li><a href="#jwt-structure">2. JWT Structure (RFC 7519)</a></li>
+        <li><a href="#standard-claims">3. Standard JWT Claims</a></li>
+        <li><a href="#oidc-claims">4. OIDC Standard Claims</a></li>
+        <li><a href="#custom-claims">5. Custom Scopes &amp; Claims</a></li>
+        <li><a href="#signing">6. RS256 vs HS256</a></li>
+        <li><a href="#jwks">7. JWKS — Key Sets</a></li>
+        <li><a href="#endpoints">8. The Four OAuth Endpoints</a></li>
+        <li><a href="#introspection">9. Token Introspection</a></li>
+        <li><a href="#lifetime">10. Token Lifetime Strategy</a></li>
+        <li><a href="#wam">11. Web Access Management</a></li>
+      </ul>
+      <div class="sidebar-nav">
+        <a href="/learn/oidc">&larr; OIDC</a>
+        <a href="/learn">Curriculum &rarr;</a>
+      </div>
+    </aside>
+
+    <div class="learn-content">
+      <div class="page-header">
+        <span class="badge">Advanced · 25 min</span>
+        <h1>Tokens, JWT &amp; Claims</h1>
+        <p class="lead">Tokens are the currency of modern identity. Understanding their structure, how they are signed, how they are validated, and how long they should live is essential for building secure systems.</p>
+      </div>
+
+      <!-- ── 1. THREE TOKEN TYPES ────────────────────────────────────────── -->
+      <section id="three-tokens">
+        <h2>1. The Three Token Types</h2>
+        <p>OAuth 2.0 and OIDC define three distinct tokens, each with a different purpose, audience, and lifetime:</p>
+
+        <div class="token-cards">
+          <div class="token-card access-card">
+            <div class="token-icon">🎟️</div>
+            <h3>Access Token</h3>
+            <div class="token-props">
+              <div class="prop"><span class="label">Audience</span><span>Resource Server (API)</span></div>
+              <div class="prop"><span class="label">Purpose</span><span>Authorize API calls</span></div>
+              <div class="prop"><span class="label">Lifetime</span><span>Short: 15 min – 1 hour</span></div>
+              <div class="prop"><span class="label">Format</span><span>Opaque string or JWT</span></div>
+            </div>
+            <div class="token-rule">The client presents this to the Resource Server. The Resource Server validates it before responding. The client should treat it as opaque — don't parse it for identity info.</div>
+          </div>
+          <div class="token-card refresh-card">
+            <div class="token-icon">🔄</div>
+            <h3>Refresh Token</h3>
+            <div class="token-props">
+              <div class="prop"><span class="label">Audience</span><span>Authorization Server only</span></div>
+              <div class="prop"><span class="label">Purpose</span><span>Obtain new access tokens</span></div>
+              <div class="prop"><span class="label">Lifetime</span><span>Long: days to weeks</span></div>
+              <div class="prop"><span class="label">Format</span><span>Always opaque</span></div>
+            </div>
+            <div class="token-rule">Never send to an API. Store securely (encrypted at rest). Revoking a refresh token invalidates the user's entire session. Rotating refresh tokens on use reduces risk.</div>
+          </div>
+          <div class="token-card id-card">
+            <div class="token-icon">🪪</div>
+            <h3>ID Token</h3>
+            <div class="token-props">
+              <div class="prop"><span class="label">Audience</span><span>Client Application</span></div>
+              <div class="prop"><span class="label">Purpose</span><span>Prove authentication, carry identity</span></div>
+              <div class="prop"><span class="label">Lifetime</span><span>Short: 5–10 minutes (used once)</span></div>
+              <div class="prop"><span class="label">Format</span><span>Always JWT (RS256)</span></div>
+            </div>
+            <div class="token-rule">OIDC only. Never send to an API as a Bearer token. The client validates it once at login, extracts claims, then uses the access token for all API calls.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 2. JWT STRUCTURE ────────────────────────────────────────────── -->
+      <section id="jwt-structure">
+        <h2>2. JWT Structure (RFC 7519)</h2>
+        <!-- Source: RFC 7519 Section 1, 3, 7 -->
+        <p>A JSON Web Token (JWT) is a compact, URL-safe representation of claims. It consists of three Base64URL-encoded parts separated by dots: <code>header.payload.signature</code>. <em>Source: RFC 7519</em></p>
+
+        <div class="jwt-visual">
+          <div class="jwt-part header-part">
+            <div class="part-label">HEADER</div>
+            <div class="part-raw">eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjFlOWdkazci<wbr>fQ</div>
+          </div>
+          <div class="jwt-dot">.</div>
+          <div class="jwt-part payload-part">
+            <div class="part-label">PAYLOAD</div>
+            <div class="part-raw">eyJpc3MiOiJodHRwczovL2F1dGhvcml6YXRpb24tc2VydmVyLmV4YW1w<wbr>bGUuY29tIiwic3ViIjoidXNlcl8xMjM0NSIs...</div>
+          </div>
+          <div class="jwt-dot">.</div>
+          <div class="jwt-part sig-part">
+            <div class="part-label">SIGNATURE</div>
+            <div class="part-raw">SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c...</div>
+          </div>
+        </div>
+
+        <h3>Header</h3>
+        <pre><code><span class="comment">// Decoded header — specifies algorithm and key</span>
+{
+  "alg": "RS256",   <span class="comment">// Signing algorithm: RS256 (asymmetric) or HS256 (symmetric)</span>
+  "typ": "JWT",     <span class="comment">// Token type</span>
+  "kid": "1e9gdk7"  <span class="comment">// Key ID — used to find the right public key in the JWKS</span>
+}</code></pre>
+
+        <h3>Payload (Claims)</h3>
+        <pre><code><span class="comment">// Decoded payload — actual token data</span>
+{
+  "iss":   "https://authorization-server.example.com",
+  "sub":   "user_12345",
+  "aud":   "https://api.example.com",
+  "exp":   1755003600,
+  "iat":   1755000000,
+  "nbf":   1755000000,
+  "jti":   "unique-token-id-abc123",
+  "scope": "read:reports write:reports",
+  "roles": ["Manager"]
+}</code></pre>
+
+        <h3>Signature</h3>
+        <pre><code><span class="comment">// For RS256 (asymmetric — recommended for production):</span>
+signature = RSA_SHA256(
+  base64url(header) + "." + base64url(payload),
+  privateKey
+)
+
+<span class="comment">// Verification uses the PUBLIC key (safe to distribute via JWKS):</span>
+valid = RSA_SHA256_Verify(signature, publicKey)</code></pre>
+
+        <div class="callout tip">
+          <strong>💡 Why JWTs Can't Be Tampered With</strong>
+          <p>The signature covers <em>every byte</em> of the encoded header and payload. Changing even a single character — such as changing <code>"roles":["Developer"]</code> to <code>"roles":["Admin"]</code> — produces a completely different hash. When the Resource Server recalculates the expected signature and compares it to the received signature, they won't match, and the token is rejected. <strong>Tampering is computationally infeasible without the private key.</strong></p>
+        </div>
+      </section>
+
+      <!-- ── 3. STANDARD JWT CLAIMS ──────────────────────────────────────── -->
+      <section id="standard-claims">
+        <h2>3. Standard JWT Claims</h2>
+        <!-- Source: RFC 7519 Section 4.1 -->
+        <p>RFC 7519 Section 4.1 defines a set of standard "Registered Claim Names" — short claim names used by convention across OAuth implementations:</p>
+
+        <table>
+          <thead><tr><th>Claim</th><th>Full Name</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>iss</code></td><td>Issuer</td><td>URI string</td><td>Identifies the Authorization Server that issued the token. The Resource Server must verify this matches the expected issuer.</td></tr>
+            <tr><td><code>sub</code></td><td>Subject</td><td>String</td><td>Identifies the principal (user or application) the token represents. Unique within the issuer's context. This is the user's stable identifier — not their email (which can change).</td></tr>
+            <tr><td><code>aud</code></td><td>Audience</td><td>String or Array</td><td>Identifies the intended recipient(s). The Resource Server must verify its own identifier is in the audience. Prevents tokens issued for one API being used at another.</td></tr>
+            <tr><td><code>exp</code></td><td>Expiration Time</td><td>NumericDate</td><td>Unix timestamp. The token MUST NOT be accepted on or after this time. Allow a small clock skew tolerance (a few minutes).</td></tr>
+            <tr><td><code>nbf</code></td><td>Not Before</td><td>NumericDate</td><td>Token is not valid before this time. Useful for issuing tokens that take effect in the future.</td></tr>
+            <tr><td><code>iat</code></td><td>Issued At</td><td>NumericDate</td><td>When the token was issued. Used to calculate how old a token is, for policy enforcement or refresh decisions.</td></tr>
+            <tr><td><code>jti</code></td><td>JWT ID</td><td>String</td><td>Unique identifier for this token. Used to prevent replay attacks — the Resource Server can check that it hasn't seen this <code>jti</code> before (requires a distributed cache or database).</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout warning">
+          <strong>⚠️ Audience Validation is Critical</strong>
+          <p>A token issued for API A should not be accepted by API B. Without <code>aud</code> validation, an attacker who obtains a valid token for a low-value API could replay it against a high-value API if they share the same issuer. Always validate <code>aud</code> contains your service's expected value.</p>
+        </div>
+      </section>
+
+      <!-- ── 4. OIDC CLAIMS ──────────────────────────────────────────────── -->
+      <section id="oidc-claims">
+        <h2>4. OIDC Standard Claims</h2>
+        <!-- Source: OIDC Core 1.0 Section 5.1 -->
+        <p>OIDC Core 1.0 Section 5.1 defines additional standard claims for user profile information, available in both ID tokens and the UserInfo endpoint response:</p>
+
+        <table>
+          <thead><tr><th>Claim</th><th>Type</th><th>Description</th><th>Scope Required</th></tr></thead>
+          <tbody>
+            <tr><td><code>sub</code></td><td>String</td><td>Subject — unique user identifier</td><td><code>openid</code></td></tr>
+            <tr><td><code>name</code></td><td>String</td><td>Full name in displayable form</td><td><code>profile</code></td></tr>
+            <tr><td><code>given_name</code></td><td>String</td><td>Given (first) name</td><td><code>profile</code></td></tr>
+            <tr><td><code>family_name</code></td><td>String</td><td>Surname / last name</td><td><code>profile</code></td></tr>
+            <tr><td><code>email</code></td><td>String</td><td>Preferred email address</td><td><code>email</code></td></tr>
+            <tr><td><code>email_verified</code></td><td>Boolean</td><td>Whether the email has been verified</td><td><code>email</code></td></tr>
+            <tr><td><code>phone_number</code></td><td>String</td><td>Preferred telephone number (E.164)</td><td><code>phone</code></td></tr>
+            <tr><td><code>phone_number_verified</code></td><td>Boolean</td><td>Whether phone has been verified</td><td><code>phone</code></td></tr>
+            <tr><td><code>picture</code></td><td>URL</td><td>URL of the user's profile picture</td><td><code>profile</code></td></tr>
+            <tr><td><code>locale</code></td><td>String</td><td>End-User's locale (e.g., en-US)</td><td><code>profile</code></td></tr>
+            <tr><td><code>zoneinfo</code></td><td>String</td><td>Time zone (e.g., America/Los_Angeles)</td><td><code>profile</code></td></tr>
+            <tr><td><code>updated_at</code></td><td>NumericDate</td><td>When user info was last updated</td><td><code>profile</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ── 5. CUSTOM CLAIMS ────────────────────────────────────────────── -->
+      <section id="custom-claims">
+        <h2>5. Custom Scopes &amp; Claims</h2>
+        <p>Applications commonly need authorization data beyond the OIDC standard claims — such as application roles, team membership, or permissions. Identity providers allow defining custom scopes that map to custom claims.</p>
+
+        <h3>Defining a Custom Scope</h3>
+        <pre><code><span class="comment">// Authorization Server configuration (concept — implementation varies by provider)</span>
+Scope: "app:access"
+Claim mapping:
+  - "roles"       ← from user's group/role assignment in the directory
+  - "department"  ← from user's department attribute
+  - "permissions" ← computed from role-permission mapping table</code></pre>
+
+        <h3>Resulting Token Claims</h3>
+        <pre><code><span class="comment">// Access token payload with custom claims</span>
+{
+  "iss":         "https://authorization-server.example.com",
+  "sub":         "user_12345",
+  "aud":         "https://api.example.com",
+  "exp":         1755003600,
+  "iat":         1755000000,
+  "scope":       "openid profile email app:access",
+  "roles":       ["Manager"],
+  "department":  "Engineering",
+  "permissions": ["read:reports", "write:reports"]
+}</code></pre>
+
+        <div class="callout note">
+          <strong>Claims vs Roles vs Permissions</strong>
+          <p><strong>Claims</strong> are key-value pairs in the token (the container). <strong>Roles</strong> are a type of claim containing user's assigned roles. <strong>Permissions/Scopes</strong> define what specific actions are allowed. Your application may receive roles from the token and then map them to granular permissions locally, or the token may carry both. The important thing is that both originate from an authoritative source (the Authorization Server) and are signed cryptographically.</p>
+        </div>
+      </section>
+
+      <!-- ── 6. SIGNING ALGORITHMS ───────────────────────────────────────── -->
+      <section id="signing">
+        <h2>6. RS256 vs HS256 — Asymmetric vs Symmetric Signing</h2>
+
+        <div class="two-col">
+          <div class="algo-card hs256">
+            <h4>HS256 — HMAC-SHA256</h4>
+            <div class="algo-tag symmetric">Symmetric</div>
+            <p>Uses a <strong>shared secret key</strong> for both signing and verification. Both the issuer and verifier must possess the same secret.</p>
+            <h5>Use when:</h5>
+            <ul>
+              <li>The issuer and verifier are the same service</li>
+              <li>You control both ends (e.g., session tokens for your own API)</li>
+            </ul>
+            <h5>Risks:</h5>
+            <ul>
+              <li>Secret must be distributed to every service that needs to verify tokens</li>
+              <li>Compromise of any verifier also compromises the signing key</li>
+              <li>Not suitable for multi-tenant or cross-organization scenarios</li>
+            </ul>
+          </div>
+          <div class="algo-card rs256">
+            <h4>RS256 — RSA-SHA256</h4>
+            <div class="algo-tag asymmetric">Asymmetric</div>
+            <p>Uses a <strong>private key to sign</strong> and a <strong>public key to verify</strong>. Only the Authorization Server holds the private key.</p>
+            <h5>Use when:</h5>
+            <ul>
+              <li>Tokens must be verified by multiple services</li>
+              <li>Third-party applications need to verify your tokens</li>
+              <li>Any production identity federation scenario</li>
+            </ul>
+            <h5>Advantages:</h5>
+            <ul>
+              <li>Public key can be freely distributed (published via JWKS)</li>
+              <li>Compromise of a verifier does not compromise the signing key</li>
+              <li>Standard for all major identity providers</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout tip">
+          <strong>💡 Recommendation: RS256 for Production</strong>
+          <p>Use RS256 for any production OIDC implementation. The public key model allows Resource Servers to fetch and cache signing keys from the JWKS endpoint without ever needing the private signing key. Key rotation is handled by the Authorization Server without any coordination required from verifiers.</p>
+        </div>
+      </section>
+
+      <!-- ── 7. JWKS ─────────────────────────────────────────────────────── -->
+      <section id="jwks">
+        <h2>7. JWKS — JSON Web Key Set</h2>
+        <!-- Source: RFC 7517 -->
+        <p>A JSON Web Key Set (JWKS) is a set of cryptographic public keys published by the Authorization Server. Resource Servers fetch the JWKS to verify JWT signatures. <em>Source: RFC 7517</em></p>
+
+        <pre><code>GET /.well-known/jwks.json HTTP/1.1
+Host: authorization-server.example.com</code></pre>
+
+        <pre><code><span class="comment">// Example JWKS response (RSA public key)</span>
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "alg": "RS256",
+      "kid": "1e9gdk7",
+      "n":   "pjdss8ZaDfEH6K6U7GeW2nxDqR4IP049fk1fK0lndimbMMVBdPv_hSpm8T...",
+      "e":   "AQAB"
+    },
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "alg": "RS256",
+      "kid": "2xG4q9p",
+      "n":   "t8Mf8bE3aRlYf4yT...",
+      "e":   "AQAB"
+    }
+  ]
+}</code></pre>
+
+        <h3>JWKS Verification Process</h3>
+        <div class="verify-steps">
+          <div class="verify-step">
+            <div class="v-num">1</div>
+            <p>Extract <code>kid</code> from the JWT header</p>
+          </div>
+          <div class="verify-arrow">→</div>
+          <div class="verify-step">
+            <div class="v-num">2</div>
+            <p>Find matching key in JWKS by <code>kid</code></p>
+          </div>
+          <div class="verify-arrow">→</div>
+          <div class="verify-step">
+            <div class="v-num">3</div>
+            <p>Reconstruct RSA public key from <code>n</code> and <code>e</code></p>
+          </div>
+          <div class="verify-arrow">→</div>
+          <div class="verify-step">
+            <div class="v-num">4</div>
+            <p>Verify JWT signature using public key</p>
+          </div>
+        </div>
+
+        <div class="callout note">
+          <strong>Key Rotation</strong>
+          <p>Best practice is to cache the JWKS but re-fetch it when you encounter an unknown <code>kid</code>. Authorization Servers rotate their signing keys periodically (typically every 90 days or on-demand). Supporting multiple keys in the JWKS allows graceful rotation without token invalidation during the transition window.</p>
+        </div>
+      </section>
+
+      <!-- ── 8. ENDPOINTS ────────────────────────────────────────────────── -->
+      <section id="endpoints">
+        <h2>8. The Four OAuth Endpoints in Detail</h2>
+
+        <h3>/authorize — Authorization Endpoint</h3>
+        <!-- Source: RFC 6749 Section 3.1 -->
+        <p>The user-facing front-channel endpoint where authentication and consent happen. <em>Source: RFC 6749 Section 3.1</em></p>
+        <pre><code>GET /authorize
+  ?response_type=code
+  &client_id=s6BhdRkqt3
+  &redirect_uri=https%3A%2F%2Fclient.example.com%2Fcb
+  &scope=openid%20profile%20email
+  &state=af0ifjsldkj
+  &nonce=n-0S6_WzA2Mj
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256</code></pre>
+
+        <h3>/token — Token Endpoint</h3>
+        <!-- Source: RFC 6749 Section 3.2 -->
+        <p>Back-channel endpoint for obtaining tokens. <em>Source: RFC 6749 Section 3.2</em></p>
+        <pre><code>POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
+
+grant_type=authorization_code
+&code=SplxlOBeZQQYbYS6WxSbIA
+&redirect_uri=https%3A%2F%2Fclient.example.com%2Fcb
+&code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk</code></pre>
+
+        <h3>/introspect — Token Introspection (RFC 7662)</h3>
+        <!-- Source: RFC 7662 -->
+        <p>Resource Servers call this to validate an opaque access token and check if it's still active. Useful when tokens are not self-contained JWTs. <em>Source: RFC 7662</em></p>
+        <pre><code>POST /introspect HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
+
+token=2YotnFZFEjr1zCsicMWpAA</code></pre>
+        <pre><code><span class="comment">// Response — active token</span>
+{
+  "active":    true,
+  "scope":     "read:reports write:reports",
+  "client_id": "l238j323ds-23ij4",
+  "username":  "janedoe@example.com",
+  "token_type":"Bearer",
+  "exp":       1419356238,
+  "iat":       1419350238,
+  "sub":       "Z5O3upPC88QrAjx00dis",
+  "aud":       "https://api.example.com",
+  "iss":       "https://authorization-server.example.com"
+}
+
+<span class="comment">// Response — expired or revoked token</span>
+{
+  "active": false
+}</code></pre>
+
+        <h3>/revoke — Token Revocation (RFC 7009)</h3>
+        <!-- Source: RFC 7009 -->
+        <p>Allows clients to immediately invalidate a token. <em>Source: RFC 7009</em></p>
+        <pre><code>POST /revoke HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
+
+token=45ghiukldjahdnhzdauz
+&token_type_hint=refresh_token
+
+<span class="comment">// Response: HTTP 200 OK (regardless of whether token was found)</span></code></pre>
+      </section>
+
+      <!-- ── 9. INTROSPECTION USE CASE ───────────────────────────────────── -->
+      <section id="introspection">
+        <h2>9. Token Validation Strategies</h2>
+        <p>Resource Servers have two strategies for validating tokens:</p>
+
+        <div class="two-col">
+          <div class="strategy-card">
+            <h4>Local JWT Validation</h4>
+            <div class="strategy-tag fast">Fast — No Network Call</div>
+            <p>Fetch the JWKS once (and cache it). Verify the JWT signature, check <code>iss</code>, <code>aud</code>, <code>exp</code> locally. This is the standard approach for RS256 JWTs.</p>
+            <h5>Limitations:</h5>
+            <ul>
+              <li>Cannot detect if a token was revoked before its <code>exp</code></li>
+              <li>Relies on token expiry for revocation effectiveness</li>
+            </ul>
+            <h5>Best practice:</h5>
+            <p>Use short access token lifetimes (15–60 minutes) so that revoked tokens expire quickly.</p>
+          </div>
+          <div class="strategy-card">
+            <h4>Token Introspection</h4>
+            <div class="strategy-tag network">Network Call Required</div>
+            <p>Call the <code>/introspect</code> endpoint for every request. The Authorization Server responds with the current token status — including whether it has been revoked.</p>
+            <h5>When to use:</h5>
+            <ul>
+              <li>Opaque (non-JWT) tokens</li>
+              <li>High-security scenarios requiring real-time revocation</li>
+              <li>When you cannot reduce token lifetime</li>
+            </ul>
+            <h5>Limitation:</h5>
+            <p>Adds latency to every API request. Use caching with a short TTL to mitigate.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 10. TOKEN LIFETIME STRATEGY ────────────────────────────────── -->
+      <section id="lifetime">
+        <h2>10. Token Lifetime Strategy</h2>
+        <p>Token lifetimes are a security-usability tradeoff. Shorter lifetimes limit exposure from theft, but require more frequent renewal.</p>
+
+        <table>
+          <thead><tr><th>Token Type</th><th>Recommended Lifetime</th><th>Rationale</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Access Token</strong></td>
+              <td>15 minutes – 1 hour</td>
+              <td>Short lifetime limits blast radius if stolen. Client uses refresh token to get new ones silently.</td>
+            </tr>
+            <tr>
+              <td><strong>ID Token</strong></td>
+              <td>5 – 10 minutes</td>
+              <td>Used once at login to establish session. Short lifetime is fine — the session lasts longer, the token doesn't need to.</td>
+            </tr>
+            <tr>
+              <td><strong>Refresh Token</strong></td>
+              <td>1 – 90 days (context-dependent)</td>
+              <td>Consumer apps: longer (weeks). High-security enterprise apps: shorter (hours/days) with idle timeout and absolute max lifetime.</td>
+            </tr>
+            <tr>
+              <td><strong>Authorization Code</strong></td>
+              <td>30 seconds – 10 minutes</td>
+              <td>Single-use, front-channel credential. Must be exchanged immediately. Short window reduces attack surface.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout warning">
+          <strong>⚠️ Refresh Token Security</strong>
+          <ul>
+            <li><strong>Refresh token rotation:</strong> Issue a new refresh token each time one is used. Invalidate the old one. If a stolen refresh token is used, the legitimate user's next request will fail — alerting you to the theft.</li>
+            <li><strong>Absolute maximum lifetime:</strong> Even if continuously active, force re-authentication after a set period (e.g., 30 days).</li>
+            <li><strong>Idle timeout:</strong> Invalidate refresh tokens that haven't been used for N days.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── 11. WAM ─────────────────────────────────────────────────────── -->
+      <section id="wam">
+        <h2>11. Web Access Management (WAM) Policies</h2>
+        <p>Tokens provide identity and authorization data. Web Access Management (WAM) systems use this data — along with environmental context — to make real-time access decisions.</p>
+
+        <div class="wam-diagram">
+          <div class="wam-request">
+            <h5>Incoming Request</h5>
+            <ul>
+              <li>Bearer Token (JWT)</li>
+              <li>Source IP Address</li>
+              <li>Device Fingerprint</li>
+              <li>Request timestamp</li>
+              <li>Resource being accessed</li>
+            </ul>
+          </div>
+          <div class="wam-arrow">→</div>
+          <div class="wam-engine">
+            <h5>⚖️ Policy Engine</h5>
+            <p>Evaluates:</p>
+            <ul>
+              <li>Token validity &amp; claims</li>
+              <li>User attributes from directory</li>
+              <li>Resource classification</li>
+              <li>Risk signals (new device? unusual location?)</li>
+              <li>Time-of-day / geo policies</li>
+            </ul>
+          </div>
+          <div class="wam-arrow">→</div>
+          <div class="wam-decision">
+            <h5>Decision</h5>
+            <div class="decision allow">✅ Allow</div>
+            <div class="decision deny">❌ Deny</div>
+            <div class="decision stepup">🔐 Step-Up Auth</div>
+          </div>
+        </div>
+
+        <p>Modern Zero Trust access control uses WAM policies to continuously evaluate access rather than trusting a token once at login. Even with a valid token, access may be denied or MFA re-challenged based on risk context — this is the <strong>Verify Explicitly</strong> principle applied to every request.</p>
+      </section>
+
+      <footer class="page-references">
+        <h3>Sources &amp; References</h3>
+        <ul>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc7519" target="_blank">RFC 7519 — JSON Web Token (JWT)</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc7517" target="_blank">RFC 7517 — JSON Web Key (JWK)</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc7518" target="_blank">RFC 7518 — JSON Web Algorithms (JWA)</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc7662" target="_blank">RFC 7662 — OAuth 2.0 Token Introspection</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc7009" target="_blank">RFC 7009 — OAuth 2.0 Token Revocation</a></li>
+          <li><a href="https://openid.net/specs/openid-connect-core-1_0.html" target="_blank">OIDC Core 1.0 — Section 5.1 (Standard Claims)</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc9700" target="_blank">RFC 9700 — OAuth 2.0 Security Best Current Practice</a></li>
+        </ul>
+        <div class="page-nav">
+          <a href="/learn/oidc">&larr; OpenID Connect</a>
+          <a href="/learn">Back to Curriculum &rarr;</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .page-header { margin-bottom: 3rem; }
+  .badge { display: inline-block; background: rgba(248,113,113,0.15); color: var(--danger); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .lead { font-size: 1.15rem; color: var(--text-muted); max-width: 680px; }
+  .sidebar-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 700; margin-bottom: 0.75rem; }
+  .sidebar-nav { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .sidebar-nav a { color: var(--primary); text-decoration: none; font-size: 0.9rem; }
+  .comment { color: var(--text-muted); font-style: italic; }
+
+  /* Token cards */
+  .token-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; margin: 1.5rem 0; }
+  .token-card { padding: 1.5rem; border-radius: 10px; border: 1px solid var(--surface-border); background: var(--surface); }
+  .access-card { border-color: rgba(251,191,36,0.4); }
+  .refresh-card { border-color: rgba(52,211,153,0.4); }
+  .id-card { border-color: rgba(56,189,248,0.4); }
+  .token-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .token-card h3 { margin: 0 0 1rem; font-size: 1.1rem; }
+  .token-props { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+  .prop { display: flex; gap: 0.5rem; font-size: 0.85rem; }
+  .prop .label { color: var(--text-muted); min-width: 80px; flex-shrink: 0; }
+  .token-rule { font-size: 0.82rem; color: var(--text-muted); border-top: 1px solid var(--surface-border); padding-top: 0.75rem; margin-top: 0.75rem; }
+
+  /* JWT visual */
+  .jwt-visual { display: flex; align-items: center; gap: 0; margin: 1.5rem 0; font-size: 0.8rem; flex-wrap: wrap; }
+  .jwt-part { flex: 1; min-width: 0; padding: 0.75rem; border-radius: 6px; }
+  .header-part { background: rgba(167,139,250,0.15); border: 1px solid rgba(167,139,250,0.4); }
+  .payload-part { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); margin: 0 0.25rem; }
+  .sig-part { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); }
+  .part-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+  .header-part .part-label { color: #a78bfa; }
+  .payload-part .part-label { color: #fbbf24; }
+  .sig-part .part-label { color: var(--success); }
+  .part-raw { font-family: monospace; word-break: break-all; color: var(--text-muted); font-size: 0.75rem; }
+  .jwt-dot { padding: 0 0.15rem; font-size: 1.5rem; color: var(--text-muted); }
+
+  /* Two-col */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+
+  /* Algorithms */
+  .algo-card { padding: 1.5rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--surface-border); }
+  .hs256 { border-color: rgba(251,191,36,0.4); }
+  .rs256 { border-color: rgba(52,211,153,0.4); }
+  .algo-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 4px; margin-bottom: 0.75rem; }
+  .symmetric { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .asymmetric { background: rgba(52,211,153,0.15); color: var(--success); }
+  .algo-card h4 { margin: 0 0 0.5rem; }
+  .algo-card h5 { margin: 1rem 0 0.4rem; font-size: 0.85rem; }
+  .algo-card ul { padding-left: 1.25rem; margin: 0; }
+  .algo-card li { font-size: 0.85rem; margin-bottom: 0.25rem; }
+  .algo-card p { font-size: 0.9rem; color: var(--text-muted); }
+
+  /* JWKS verify steps */
+  .verify-steps { display: flex; align-items: center; gap: 0.5rem; margin: 1.5rem 0; flex-wrap: wrap; }
+  .verify-step { flex: 1; min-width: 120px; padding: 0.75rem; background: var(--surface); border: 1px solid var(--surface-border); border-radius: 8px; text-align: center; }
+  .v-num { width: 28px; height: 28px; background: var(--primary); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; margin: 0 auto 0.5rem; }
+  .verify-step p { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
+  .verify-arrow { color: var(--primary); font-size: 1.25rem; flex-shrink: 0; }
+
+  /* Strategy cards */
+  .strategy-card { padding: 1.5rem; background: var(--surface); border: 1px solid var(--surface-border); border-radius: 8px; }
+  .strategy-card h4 { margin: 0 0 0.5rem; }
+  .strategy-card h5 { margin: 1rem 0 0.4rem; font-size: 0.85rem; }
+  .strategy-card ul { padding-left: 1.25rem; margin: 0; }
+  .strategy-card li { font-size: 0.85rem; margin-bottom: 0.25rem; }
+  .strategy-card p { color: var(--text-muted); font-size: 0.9rem; margin: 0.5rem 0; }
+  .strategy-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 4px; margin-bottom: 0.75rem; }
+  .strategy-tag.fast { background: rgba(52,211,153,0.15); color: var(--success); }
+  .strategy-tag.network { background: rgba(251,191,36,0.15); color: #fbbf24; }
+
+  /* WAM diagram */
+  .wam-diagram { display: flex; align-items: stretch; gap: 0; margin: 1.5rem 0; }
+  .wam-request, .wam-engine, .wam-decision { flex: 1; padding: 1.25rem; background: var(--surface); border: 1px solid var(--surface-border); }
+  .wam-request { border-radius: 8px 0 0 8px; }
+  .wam-decision { border-radius: 0 8px 8px 0; }
+  .wam-arrow { display: flex; align-items: center; padding: 0 0.5rem; color: var(--primary); font-size: 1.25rem; background: var(--surface); border-top: 1px solid var(--surface-border); border-bottom: 1px solid var(--surface-border); }
+  .wam-request h5, .wam-engine h5, .wam-decision h5 { margin: 0 0 0.75rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+  .wam-request ul, .wam-engine ul { list-style: none; padding: 0; margin: 0; }
+  .wam-request li, .wam-engine li { font-size: 0.85rem; margin-bottom: 0.25rem; }
+  .wam-engine p { font-size: 0.8rem; color: var(--text-muted); margin: 0 0 0.5rem; }
+  .decision { padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .decision.allow { background: rgba(52,211,153,0.15); color: var(--success); }
+  .decision.deny { background: rgba(248,113,113,0.15); color: var(--danger); }
+  .decision.stepup { background: rgba(251,191,36,0.15); color: #fbbf24; }
+
+  .page-references { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--surface-border); }
+  .page-references h3 { margin-bottom: 1rem; }
+  .page-references ul { list-style: none; padding: 0; }
+  .page-references li { margin-bottom: 0.5rem; }
+  .page-references a { color: var(--primary); text-decoration: none; }
+  .page-references a:hover { text-decoration: underline; }
+  .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; }
+  .page-nav a { color: var(--primary); text-decoration: none; font-weight: 600; }
+
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .wam-diagram { flex-direction: column; }
+    .wam-arrow { transform: rotate(90deg); padding: 0.5rem; justify-content: center; }
+    .wam-request, .wam-decision { border-radius: 8px; }
+    .verify-steps { flex-direction: column; }
+    .verify-arrow { transform: rotate(90deg); }
+  }
+</style>

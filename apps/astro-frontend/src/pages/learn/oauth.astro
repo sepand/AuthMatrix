@@ -1,0 +1,609 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="OAuth 2.0 Deep Dive | AuthMatrix Learn">
+  <div class="learn-page">
+    <!-- Sticky Sidebar TOC -->
+    <aside class="learn-sidebar">
+      <p class="sidebar-label">In this article</p>
+      <ul>
+        <li><a href="#what-is-oauth">1. What is OAuth 2.0?</a></li>
+        <li><a href="#why-oauth">2. The Problem OAuth Solves</a></li>
+        <li><a href="#oauth-vs-saml">3. OAuth vs SAML vs API Keys</a></li>
+        <li><a href="#actors">4. The Four OAuth Actors</a></li>
+        <li><a href="#scopes-consent">5. Scopes &amp; Consent</a></li>
+        <li><a href="#client-types">6. Public vs Confidential Clients</a></li>
+        <li><a href="#channels">7. Front Channel vs Back Channel</a></li>
+        <li><a href="#endpoints">8. OAuth Endpoints</a></li>
+        <li><a href="#api-keys-vs-tokens">9. API Keys vs Access Tokens</a></li>
+        <li><a href="#wam">10. Web Access Management</a></li>
+        <li><a href="#best-practices">11. Security Best Practices</a></li>
+        <li><a href="#interoperability">12. Interoperability Note</a></li>
+      </ul>
+      <div class="sidebar-nav">
+        <a href="/learn">&larr; Curriculum</a>
+        <a href="/learn/flows">Flows &rarr;</a>
+      </div>
+    </aside>
+
+    <div class="learn-content">
+      <div class="page-header">
+        <span class="badge">Beginner · 20 min</span>
+        <h1>OAuth 2.0 Deep Dive</h1>
+        <p class="lead">Understand the framework that powers modern API authorization — what it is, what it is not, and how all the pieces fit together.</p>
+      </div>
+
+      <!-- ── 1. WHAT IS OAUTH ─────────────────────────────────────────────── -->
+      <section id="what-is-oauth">
+        <h2>1. What is OAuth 2.0?</h2>
+        <p>OAuth 2.0 is a <strong>delegated authorization framework</strong> — not an authentication protocol. Its job is to allow an application to access resources on behalf of a user, without the user handing over their credentials.</p>
+
+        <div class="callout note">
+          <strong>RFC 6749, Section 1</strong>
+          <p>"The OAuth 2.0 authorization framework enables a third-party application to obtain limited access to an HTTP service, either on behalf of a resource owner by orchestrating an approval interaction between the resource owner and the HTTP service, or by allowing the third-party application to obtain access on its own behalf."</p>
+        </div>
+
+        <div class="callout warning">
+          <strong>⚠️ Common Misconception</strong>
+          <p>OAuth 2.0 <em>authorizes</em> applications. It does not <em>authenticate</em> users. Using an access token does not tell you <em>who</em> the user is — only <em>what</em> they authorized. Authentication is handled by OpenID Connect (OIDC), which is built on top of OAuth 2.0.</p>
+        </div>
+
+        <h3>The Valet Key Analogy</h3>
+        <p>Your car's regular key unlocks every door, opens the trunk, and starts the engine. A <em>valet key</em> is limited: it starts the car and opens the driver's door only — the trunk stays locked.</p>
+        <p>OAuth 2.0 gives applications <strong>valet keys</strong> (access tokens) — scoped, time-limited credentials that grant specific permissions without exposing the master credentials (your password).</p>
+
+        <h3>Key Design Decisions in OAuth 2.0</h3>
+        <ul>
+          <li>Works over HTTPS — no cryptographic signing required at the application layer</li>
+          <li>Tokens are <strong>bearer tokens</strong>: possession implies authorization (like cash)</li>
+          <li>Access tokens are opaque to the Client — only the Resource Server (API) needs to understand them</li>
+          <li>Authorization decisions are <strong>scoped</strong> — granular permission control</li>
+          <li>OAuth 2.0 is a <strong>framework</strong>, not a strict protocol — implementations vary</li>
+        </ul>
+      </section>
+
+      <!-- ── 2. WHY OAUTH ────────────────────────────────────────────────── -->
+      <section id="why-oauth">
+        <h2>2. The Problem OAuth Solves</h2>
+        <h3>The Password Anti-Pattern</h3>
+        <p>Before OAuth, when a third-party app needed access to your data (say, a printing service needing your cloud photos), it would ask for your username and password directly. This created several serious problems:</p>
+
+        <div class="problem-grid">
+          <div class="problem-card danger">
+            <div class="icon">🔑</div>
+            <h4>Over-Privileged</h4>
+            <p>The app gets <em>full access</em> to your account. It can read, write, and delete everything — not just the photos it needs.</p>
+          </div>
+          <div class="problem-card danger">
+            <div class="icon">🚫</div>
+            <h4>No Revocation</h4>
+            <p>The only way to revoke the app's access is to change your password — which breaks <em>all</em> other apps using that same password.</p>
+          </div>
+          <div class="problem-card danger">
+            <div class="icon">⚡</div>
+            <h4>Credential Exposure</h4>
+            <p>If the third-party app is breached, your actual credentials are exposed — not just the app. The breach propagates to your main account.</p>
+          </div>
+          <div class="problem-card danger">
+            <div class="icon">👁️</div>
+            <h4>No Audit Trail</h4>
+            <p>There's no way to see which apps have your password, or to distinguish between direct user actions and delegated app actions.</p>
+          </div>
+        </div>
+
+        <h3>OAuth's Solution</h3>
+        <p>OAuth removes the password from the equation. The user authenticates directly with the service that holds their data (never with the third-party app). The service then issues a <strong>scoped, time-limited access token</strong> to the app. The app presents this token when making API calls — it never sees the user's password.</p>
+      </section>
+
+      <!-- ── 3. COMPARISON TABLE ─────────────────────────────────────────── -->
+      <section id="oauth-vs-saml">
+        <h2>3. OAuth 2.0 vs SAML 2.0 vs API Keys</h2>
+        <p>These three technologies solve related but distinct problems. Understanding the differences prevents misuse.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>SAML 2.0</th>
+              <th>OAuth 2.0</th>
+              <th>API Keys</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Primary Purpose</strong></td><td>Authentication / SSO</td><td>Delegated Authorization</td><td>Application Identity</td></tr>
+            <tr><td><strong>Token Format</strong></td><td>XML Assertion (signed)</td><td>Opaque string or JWT</td><td>Static string</td></tr>
+            <tr><td><strong>Transport</strong></td><td>XML over HTTP POST / Redirect</td><td>JSON over HTTPS</td><td>HTTP Header</td></tr>
+            <tr><td><strong>User Context</strong></td><td>Yes</td><td>Optional (requires OIDC)</td><td>No (app only)</td></tr>
+            <tr><td><strong>Scoped Access</strong></td><td>Limited</td><td>Yes (fine-grained)</td><td>No (binary: all or nothing)</td></tr>
+            <tr><td><strong>Expiry / Rotation</strong></td><td>Short-lived assertions</td><td>Short-lived tokens + refresh</td><td>Long-lived, manual rotation</td></tr>
+            <tr><td><strong>Mobile Support</strong></td><td>Poor (XML heavy)</td><td>Excellent</td><td>Excellent</td></tr>
+            <tr><td><strong>Dynamic Discovery</strong></td><td>Manual metadata XML</td><td>Via OIDC /.well-known</td><td>None</td></tr>
+            <tr><td><strong>Best For</strong></td><td>Enterprise SSO, legacy federation</td><td>Modern APIs, third-party access</td><td>Simple server-to-server</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout tip">
+          <strong>💡 When to use each</strong>
+          <p>Use <strong>SAML 2.0</strong> for integrating with enterprise systems that require it (HR systems, on-prem apps). Use <strong>OAuth 2.0 + OIDC</strong> for all modern web and mobile applications. Use <strong>API Keys</strong> only for simple, non-user-facing server integrations where you control both sides.</p>
+        </div>
+      </section>
+
+      <!-- ── 4. FOUR ACTORS ──────────────────────────────────────────────── -->
+      <section id="actors">
+        <h2>4. The Four OAuth Actors</h2>
+        <!-- Source: RFC 6749 Section 1.1 -->
+        <p>RFC 6749 Section 1.1 defines four roles that participate in every OAuth authorization flow:</p>
+
+        <div class="actor-definitions">
+          <div class="actor-def">
+            <div class="actor-num">1</div>
+            <div>
+              <h4>Resource Owner</h4>
+              <p>The entity capable of granting access to a protected resource. In most cases, this is the <strong>end-user</strong> — the person whose data is being accessed. The resource owner authenticates with the Authorization Server and grants consent.</p>
+            </div>
+          </div>
+          <div class="actor-def">
+            <div class="actor-num">2</div>
+            <div>
+              <h4>Resource Server</h4>
+              <p>The server hosting the protected resources — typically your <strong>API</strong>. It accepts access tokens in requests and enforces authorization. The Resource Server validates the token (checking signature, expiry, scope) before responding.</p>
+            </div>
+          </div>
+          <div class="actor-def">
+            <div class="actor-num">3</div>
+            <div>
+              <h4>Client</h4>
+              <p>The application requesting access to protected resources on behalf of the Resource Owner. This is <strong>your application</strong> — a web app, mobile app, CLI tool, or service. The client must be registered with the Authorization Server and has a <code>client_id</code>.</p>
+            </div>
+          </div>
+          <div class="actor-def">
+            <div class="actor-num">4</div>
+            <div>
+              <h4>Authorization Server</h4>
+              <p>Issues access tokens to the client after successfully authenticating the resource owner and obtaining authorization. The Authorization Server is the <strong>trust anchor</strong> — it verifies identity, enforces consent, and signs tokens.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actor relationship diagram -->
+        <div class="diagram" aria-label="OAuth 2.0 actor relationship diagram">
+          <div class="diag-flow">
+            <div class="diag-actor primary-actor">
+              <div class="diag-icon">👤</div>
+              <div>Resource Owner</div>
+              <div class="diag-sub">The User</div>
+            </div>
+            <div class="diag-arrows">
+              <div class="diag-arrow right">
+                <span class="arrow-label">① Authorizes via browser</span>
+                <div class="arrow-line">→</div>
+              </div>
+              <div class="diag-arrow left">
+                <span class="arrow-label">② Auth code redirected back</span>
+                <div class="arrow-line">←</div>
+              </div>
+            </div>
+            <div class="diag-actor accent-actor">
+              <div class="diag-icon">🏛️</div>
+              <div>Authorization Server</div>
+              <div class="diag-sub">Issues Tokens</div>
+            </div>
+          </div>
+          <div class="diag-flow" style="margin-top: 1.5rem;">
+            <div class="diag-actor success-actor">
+              <div class="diag-icon">💻</div>
+              <div>Client</div>
+              <div class="diag-sub">Your Application</div>
+            </div>
+            <div class="diag-arrows">
+              <div class="diag-arrow right">
+                <span class="arrow-label">③ API call with Bearer token</span>
+                <div class="arrow-line">→</div>
+              </div>
+              <div class="diag-arrow left">
+                <span class="arrow-label">④ Protected resource response</span>
+                <div class="arrow-line">←</div>
+              </div>
+            </div>
+            <div class="diag-actor">
+              <div class="diag-icon">🗄️</div>
+              <div>Resource Server</div>
+              <div class="diag-sub">The API</div>
+            </div>
+          </div>
+          <div class="diag-vertical">
+            <div class="diag-vertical-arrow">⑤ Token issued</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 5. SCOPES & CONSENT ─────────────────────────────────────────── -->
+      <section id="scopes-consent">
+        <h2>5. OAuth Scopes &amp; Consent</h2>
+        <p>Scopes are <strong>strings that define what access is being requested</strong>. They implement the Least Privilege principle — the client requests only the minimum permissions it needs.</p>
+
+        <h3>What a Scope Looks Like</h3>
+        <p>Scopes are space-separated strings in the authorization request:</p>
+        <pre><code>scope=openid profile email read:contacts write:calendar</code></pre>
+
+        <h3>Consent Screen</h3>
+        <p>When a user approves an OAuth request, they see a <strong>consent screen</strong> that lists exactly what the application is requesting. This gives users visibility and control. The Authorization Server only issues tokens for the scopes the user explicitly consented to.</p>
+
+        <table>
+          <thead><tr><th>Scope</th><th>What It Grants</th><th>Who Defines It</th></tr></thead>
+          <tbody>
+            <tr><td><code>openid</code></td><td>Signals an OIDC request. Required for ID token issuance.</td><td>OIDC Core Spec</td></tr>
+            <tr><td><code>profile</code></td><td>name, picture, locale, etc.</td><td>OIDC Core Spec</td></tr>
+            <tr><td><code>email</code></td><td>email address and verified status</td><td>OIDC Core Spec</td></tr>
+            <tr><td><code>offline_access</code></td><td>Issues a refresh token</td><td>OIDC Core Spec</td></tr>
+            <tr><td><code>read:reports</code></td><td>Read-only access to reports API</td><td>Your API (Custom)</td></tr>
+            <tr><td><code>write:users</code></td><td>Create/modify users via API</td><td>Your API (Custom)</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout tip">
+          <strong>💡 Scopes vs Claims</strong>
+          <p>Scopes are requested at authorization time. Claims are key-value pairs inside the token that carry the information corresponding to those scopes. Requesting the <code>email</code> scope causes the <code>email</code> and <code>email_verified</code> claims to appear in the token.</p>
+        </div>
+      </section>
+
+      <!-- ── 6. CLIENT TYPES ─────────────────────────────────────────────── -->
+      <section id="client-types">
+        <h2>6. Public vs Confidential Clients</h2>
+        <!-- Source: RFC 6749 Section 2.1 -->
+        <p>RFC 6749 Section 2.1 defines two client types based on their ability to keep credentials secret:</p>
+
+        <div class="two-col">
+          <div class="type-card type-confidential">
+            <h4>🔒 Confidential Client</h4>
+            <p>Can maintain the confidentiality of its credentials. Typically runs on a <strong>secure server</strong> that the user cannot access or inspect.</p>
+            <ul>
+              <li>Server-side web apps (Node.js, Python, Java)</li>
+              <li>Backend microservices</li>
+              <li>CLI tools running on trusted infrastructure</li>
+            </ul>
+            <p><strong>Has a client_secret</strong> stored securely on the server.</p>
+          </div>
+          <div class="type-card type-public">
+            <h4>🌐 Public Client</h4>
+            <p>Cannot maintain confidentiality. Code runs in environments the user controls or can inspect.</p>
+            <ul>
+              <li>Single Page Applications (JavaScript in browser)</li>
+              <li>Mobile / native apps</li>
+              <li>IoT devices</li>
+            </ul>
+            <p><strong>No client_secret.</strong> Uses PKCE instead.</p>
+          </div>
+        </div>
+
+        <div class="callout danger">
+          <strong>🚨 Never embed a client_secret in a public client</strong>
+          <p>JavaScript source code is visible to anyone who opens DevTools. Mobile app binaries can be decompiled. If a client_secret is in client-side or distributed code, it is <strong>not a secret</strong>. Use PKCE for all public clients instead.</p>
+        </div>
+      </section>
+
+      <!-- ── 7. CHANNELS ─────────────────────────────────────────────────── -->
+      <section id="channels">
+        <h2>7. Front Channel vs Back Channel</h2>
+        <p>OAuth separates its communication into two channels based on security characteristics:</p>
+
+        <div class="two-col">
+          <div class="channel-card front">
+            <h4>🌐 Front Channel</h4>
+            <p><strong>Goes through the browser's URL bar.</strong> The user can see and inspect this traffic. Used for redirects between the client and the Authorization Server.</p>
+            <ul>
+              <li>Authorization Request (GET /authorize)</li>
+              <li>Authorization Response (redirect with code)</li>
+              <li>Logout redirects</li>
+            </ul>
+            <div class="channel-risk">
+              <strong>Security risk:</strong> URLs appear in browser history, server logs, and Referer headers. Never put sensitive data (like tokens) in the front channel. The authorization <code>code</code> must be short-lived and single-use.
+            </div>
+          </div>
+          <div class="channel-card back">
+            <h4>🔒 Back Channel</h4>
+            <p><strong>Direct server-to-server HTTPS communication.</strong> Not visible to the user or browser.</p>
+            <ul>
+              <li>Token Request (POST /token)</li>
+              <li>Token Refresh</li>
+              <li>Token Introspection</li>
+              <li>Token Revocation</li>
+              <li>UserInfo endpoint calls</li>
+            </ul>
+            <div class="channel-secure">
+              <strong>Secure:</strong> Traffic is encrypted and authenticated. Tokens are exchanged here — never in the front channel.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 8. ENDPOINTS ────────────────────────────────────────────────── -->
+      <section id="endpoints">
+        <h2>8. OAuth Endpoints</h2>
+        <p>An Authorization Server exposes four key endpoints. Each serves a specific purpose in the OAuth flow.</p>
+
+        <div class="endpoint-list">
+          <div class="endpoint-item">
+            <div class="endpoint-method get">GET</div>
+            <div class="endpoint-detail">
+              <h4><code>/authorize</code> — Authorization Endpoint</h4>
+              <p>Where the user is redirected to authenticate and grant consent. <strong>Front channel.</strong> Returns an authorization code after user approval.</p>
+              <p><em>Source: RFC 6749 Section 3.1</em></p>
+            </div>
+          </div>
+          <div class="endpoint-item">
+            <div class="endpoint-method post">POST</div>
+            <div class="endpoint-detail">
+              <h4><code>/token</code> — Token Endpoint</h4>
+              <p>Where the authorization code is exchanged for tokens. <strong>Back channel only.</strong> Also used for token refresh and Client Credentials grants.</p>
+              <p><em>Source: RFC 6749 Section 3.2</em></p>
+            </div>
+          </div>
+          <div class="endpoint-item">
+            <div class="endpoint-method post">POST</div>
+            <div class="endpoint-detail">
+              <h4><code>/introspect</code> — Token Introspection</h4>
+              <p>Resource Servers use this to validate a received token and check if it is still active. Returns token metadata including scope and expiry. <em>Source: RFC 7662</em></p>
+            </div>
+          </div>
+          <div class="endpoint-item">
+            <div class="endpoint-method post">POST</div>
+            <div class="endpoint-detail">
+              <h4><code>/revoke</code> — Token Revocation</h4>
+              <p>Allows clients to notify the Authorization Server that a token is no longer needed and should be invalidated immediately. <em>Source: RFC 7009</em></p>
+            </div>
+          </div>
+        </div>
+
+        <h3>Discovery: Finding These Endpoints</h3>
+        <p>Authorization Servers publish their metadata at a well-known URL (from OpenID Connect Discovery, RFC 8414):</p>
+        <pre><code>GET /.well-known/openid-configuration
+GET /.well-known/oauth-authorization-server</code></pre>
+        <p>This metadata document lists all endpoint URLs, supported grant types, scopes, and signing algorithms — enabling dynamic, zero-configuration federation.</p>
+      </section>
+
+      <!-- ── 9. API KEYS VS TOKENS ───────────────────────────────────────── -->
+      <section id="api-keys-vs-tokens">
+        <h2>9. API Keys vs OAuth Access Tokens</h2>
+        <p>Many teams start with static API keys. Here's why OAuth access tokens are significantly superior for any non-trivial use case:</p>
+
+        <table>
+          <thead><tr><th>Property</th><th>Static API Key</th><th>OAuth Access Token</th></tr></thead>
+          <tbody>
+            <tr><td><strong>User Context</strong></td><td>❌ None — only identifies the app</td><td>✅ Carries user identity (sub, email)</td></tr>
+            <tr><td><strong>Scoped Permissions</strong></td><td>❌ All-or-nothing</td><td>✅ Fine-grained scopes per token</td></tr>
+            <tr><td><strong>Expiry</strong></td><td>❌ Long-lived (months/years)</td><td>✅ Short-lived (minutes to hours)</td></tr>
+            <tr><td><strong>Revocation</strong></td><td>⚠️ Delete and re-issue (downtime)</td><td>✅ Instant via /revoke endpoint</td></tr>
+            <tr><td><strong>Audit Trail</strong></td><td>❌ Cannot distinguish users</td><td>✅ Every call attributed to a user + app</td></tr>
+            <tr><td><strong>Rotation</strong></td><td>⚠️ Manual, risky</td><td>✅ Automatic via refresh tokens</td></tr>
+            <tr><td><strong>Tamper Detection</strong></td><td>❌ Opaque string, no verification</td><td>✅ JWT signature is cryptographically verified</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ── 10. WAM ──────────────────────────────────────────────────────── -->
+      <section id="wam">
+        <h2>10. Web Access Management (WAM) Policies</h2>
+        <p>Web Access Management (WAM) systems sit in front of applications and enforce access policies based on multiple contextual signals — not just possession of a valid token.</p>
+        <p>A WAM policy engine evaluates:</p>
+        <ul>
+          <li><strong>User attributes</strong> — Who is the user? What is their role? What groups do they belong to?</li>
+          <li><strong>Resource attributes</strong> — What resource is being accessed? What classification does it have?</li>
+          <li><strong>Environmental context</strong> — What time is it? What is the user's IP address? What device are they on?</li>
+          <li><strong>Risk signals</strong> — Is this a new device? Unusual login location? Velocity anomaly?</li>
+        </ul>
+        <p>OAuth scopes and tokens feed <em>into</em> WAM systems as inputs. The WAM policy makes the final enforcement decision, potentially requiring step-up authentication (MFA challenge) even with a valid token.</p>
+        <div class="callout note">
+          <strong>Zero Trust Connection</strong>
+          <p>WAM policies embody Zero Trust's "Verify Explicitly" principle. A valid token is necessary but not sufficient. The WAM engine continuously re-evaluates access, which is why short-lived tokens with frequent refresh cycles are preferred over long-lived static credentials.</p>
+        </div>
+      </section>
+
+      <!-- ── 11. BEST PRACTICES ──────────────────────────────────────────── -->
+      <section id="best-practices">
+        <h2>11. Security Best Practices</h2>
+        <!-- Source: RFC 9700 (OAuth 2.0 Security Best Current Practice) -->
+        <p>The following rules come directly from <strong>RFC 9700: OAuth 2.0 Security Best Current Practice</strong> and the original RFC 6749.</p>
+
+        <div class="practices-list">
+          <div class="practice-item">
+            <div class="practice-num">01</div>
+            <div>
+              <h4>Always Use the <code>state</code> Parameter (CSRF Protection)</h4>
+              <p>Generate a cryptographically random, unguessable string for each authorization request. Include it in the request and verify it matches on the callback. This prevents Cross-Site Request Forgery (CSRF) attacks where an attacker could trick a user into completing an authorization for a different session.</p>
+              <pre><code>// Generate state: crypto.randomBytes(16).toString('hex')
+GET /authorize?...&state=af0ifjsldkj
+
+// On callback — verify:
+if (returnedState !== sessionState) throw new Error('CSRF detected');</code></pre>
+            </div>
+          </div>
+
+          <div class="practice-item">
+            <div class="practice-num">02</div>
+            <div>
+              <h4>Use PKCE for All Public Clients (RFC 7636)</h4>
+              <p>Proof Key for Code Exchange (PKCE) protects against authorization code interception attacks. Required for all public clients (SPAs, mobile apps) and recommended for all clients in RFC 9700.</p>
+            </div>
+          </div>
+
+          <div class="practice-item">
+            <div class="practice-num">03</div>
+            <div>
+              <h4>Strictly Whitelist Redirect URIs</h4>
+              <p>The Authorization Server must only redirect to pre-registered URIs. Open redirectors allow attackers to capture authorization codes by injecting a redirect_uri pointing to an attacker-controlled site. Exact string matching is required — not prefix matching or wildcards.</p>
+            </div>
+          </div>
+
+          <div class="practice-item">
+            <div class="practice-num">04</div>
+            <div>
+              <h4>Use Short-Lived Access Tokens</h4>
+              <p>Short expiry times (15 minutes to 1 hour) limit the window of exposure if a token is stolen. Refresh tokens are used to obtain new access tokens without re-prompting the user.</p>
+            </div>
+          </div>
+
+          <div class="practice-item">
+            <div class="practice-num">05</div>
+            <div>
+              <h4>Bind Client to Authorization Grant</h4>
+              <p>Always include <code>client_id</code> in token requests. The Authorization Server must verify that the token request comes from the same client that received the authorization grant. This prevents authorization code theft by other clients registered on the same server.</p>
+            </div>
+          </div>
+
+          <div class="practice-item">
+            <div class="practice-num">06</div>
+            <div>
+              <h4>Never Embed <code>client_secret</code> in Distributed Code</h4>
+              <p>A secret in a JavaScript bundle, mobile app binary, or public repository is not a secret. Confidential clients store secrets in environment variables or secret management systems (e.g., Azure Key Vault, AWS Secrets Manager). Public clients have no client_secret — they use PKCE.</p>
+            </div>
+          </div>
+
+          <div class="practice-item">
+            <div class="practice-num">07</div>
+            <div>
+              <h4>Use HTTPS Everywhere</h4>
+              <p>All OAuth communication must occur over HTTPS (TLS). This includes the Authorization endpoint, Token endpoint, and all API calls. Localhost may use HTTP for development only.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 12. INTEROPERABILITY ───────────────────────────────────────── -->
+      <section id="interoperability">
+        <h2>12. The Interoperability Note</h2>
+        <div class="callout warning">
+          <strong>⚠️ OAuth 2.0 is a Framework, Not a Protocol</strong>
+          <p>Unlike SAML, which is a strict protocol with a specific XML format, OAuth 2.0 is a <em>framework</em>. This means there is significant latitude in how servers implement it. Two servers can both claim "OAuth 2.0 support" but have incompatible implementations in areas such as:</p>
+          <ul>
+            <li>How scopes are defined and validated</li>
+            <li>What claims appear in access tokens</li>
+            <li>How token introspection works</li>
+            <li>What error codes are returned</li>
+          </ul>
+          <p><strong>Mitigation:</strong> Use OpenID Connect where possible. OIDC adds normative requirements on top of OAuth 2.0 that solve many interoperability gaps — specifically the standardized ID Token, UserInfo endpoint, and discovery document.</p>
+        </div>
+      </section>
+
+      <!-- Footer references -->
+      <footer class="page-references">
+        <h3>Sources &amp; References</h3>
+        <ul>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc6749" target="_blank">RFC 6749 — The OAuth 2.0 Authorization Framework</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc9700" target="_blank">RFC 9700 — OAuth 2.0 Security Best Current Practice</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc7662" target="_blank">RFC 7662 — OAuth 2.0 Token Introspection</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc7009" target="_blank">RFC 7009 — OAuth 2.0 Token Revocation</a></li>
+          <li><a href="https://datatracker.ietf.org/doc/html/rfc8414" target="_blank">RFC 8414 — OAuth 2.0 Authorization Server Metadata</a></li>
+          <li><a href="https://oauth.net/articles/authentication/" target="_blank">oauth.net — User Authentication with OAuth 2.0</a></li>
+        </ul>
+        <div class="page-nav">
+          <a href="/learn">&larr; Curriculum Hub</a>
+          <a href="/learn/flows">Grant Types &amp; Flows &rarr;</a>
+        </div>
+      </footer>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .page-header { margin-bottom: 3rem; }
+  .badge {
+    display: inline-block;
+    background: rgba(56,189,248,0.15);
+    color: var(--primary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .lead { font-size: 1.15rem; color: var(--text-muted); max-width: 680px; }
+
+  /* Actor definitions */
+  .actor-definitions { display: flex; flex-direction: column; gap: 1rem; margin: 1.5rem 0; }
+  .actor-def { display: flex; gap: 1.25rem; align-items: flex-start; padding: 1.25rem; background: var(--surface); border-radius: 8px; border: 1px solid var(--surface-border); }
+  .actor-num { width: 36px; height: 36px; background: var(--primary); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; font-size: 0.9rem; }
+  .actor-def h4 { margin: 0 0 0.5rem; color: var(--primary); }
+  .actor-def p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+
+  /* Diagram */
+  .diag-flow { display: flex; align-items: center; justify-content: center; gap: 0; width: 100%; }
+  .diag-actor { text-align: center; padding: 1rem 1.5rem; border: 2px solid var(--surface-border); border-radius: 8px; background: var(--bg); min-width: 160px; font-weight: 600; font-size: 0.9rem; }
+  .diag-actor.primary-actor { border-color: var(--primary); }
+  .diag-actor.accent-actor { border-color: #a78bfa; }
+  .diag-actor.success-actor { border-color: var(--success); }
+  .diag-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .diag-sub { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; margin-top: 0.25rem; }
+  .diag-arrows { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; padding: 0 1rem; }
+  .diag-arrow { display: flex; align-items: center; gap: 0.5rem; }
+  .arrow-label { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+  .arrow-line { flex: 1; color: var(--primary); font-size: 1.2rem; }
+  .diag-vertical { text-align: center; margin: 0.5rem 0; font-size: 0.8rem; color: var(--text-muted); }
+
+  /* Problem grid */
+  .problem-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .problem-card { padding: 1.25rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--surface-border); }
+  .problem-card.danger { border-color: rgba(248,113,113,0.4); }
+  .problem-card .icon { font-size: 1.75rem; margin-bottom: 0.5rem; }
+  .problem-card h4 { margin: 0 0 0.5rem; font-size: 1rem; }
+  .problem-card p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+
+  /* Two-col layouts */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+  .type-card { padding: 1.5rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--surface-border); }
+  .type-confidential { border-color: var(--success); }
+  .type-public { border-color: #fbbf24; }
+  .type-card h4 { margin: 0 0 1rem; }
+  .type-card ul { margin: 1rem 0; padding-left: 1.25rem; }
+  .type-card li { margin-bottom: 0.4rem; font-size: 0.9rem; }
+
+  .channel-card { padding: 1.5rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--surface-border); }
+  .channel-card.front { border-color: #fbbf24; }
+  .channel-card.back { border-color: var(--success); }
+  .channel-card h4 { margin: 0 0 0.75rem; }
+  .channel-card ul { margin: 0.75rem 0; padding-left: 1.25rem; }
+  .channel-card li { margin-bottom: 0.4rem; font-size: 0.9rem; }
+  .channel-risk { margin-top: 1rem; padding: 0.75rem; background: rgba(251,191,36,0.1); border-radius: 6px; font-size: 0.85rem; }
+  .channel-secure { margin-top: 1rem; padding: 0.75rem; background: rgba(52,211,153,0.1); border-radius: 6px; font-size: 0.85rem; }
+
+  /* Endpoints */
+  .endpoint-list { display: flex; flex-direction: column; gap: 1rem; margin: 1.5rem 0; }
+  .endpoint-item { display: flex; gap: 1rem; align-items: flex-start; padding: 1.25rem; background: var(--surface); border-radius: 8px; border: 1px solid var(--surface-border); }
+  .endpoint-method { padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 0.25rem; }
+  .endpoint-method.get { background: rgba(56,189,248,0.2); color: var(--primary); }
+  .endpoint-method.post { background: rgba(52,211,153,0.2); color: var(--success); }
+  .endpoint-detail h4 { margin: 0 0 0.5rem; }
+  .endpoint-detail p { margin: 0 0 0.25rem; font-size: 0.9rem; color: var(--text-muted); }
+
+  /* Security Practices */
+  .practices-list { display: flex; flex-direction: column; gap: 1.25rem; }
+  .practice-item { display: flex; gap: 1.25rem; padding: 1.5rem; background: var(--surface); border-radius: 8px; border: 1px solid var(--surface-border); }
+  .practice-num { font-size: 1.5rem; font-weight: 800; color: var(--primary); opacity: 0.4; flex-shrink: 0; min-width: 40px; }
+  .practice-item h4 { margin: 0 0 0.5rem; font-size: 1rem; }
+  .practice-item p { margin: 0.5rem 0 0; font-size: 0.9rem; color: var(--text-muted); }
+  .practice-item pre { margin-top: 0.75rem; }
+
+  /* Sidebar */
+  .sidebar-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 700; margin-bottom: 0.75rem; }
+  .sidebar-nav { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .sidebar-nav a { color: var(--primary); text-decoration: none; font-size: 0.9rem; }
+
+  /* References footer */
+  .page-references { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--surface-border); }
+  .page-references h3 { margin-bottom: 1rem; }
+  .page-references ul { list-style: none; padding: 0; }
+  .page-references li { margin-bottom: 0.5rem; }
+  .page-references a { color: var(--primary); text-decoration: none; }
+  .page-references a:hover { text-decoration: underline; }
+  .page-nav { display: flex; justify-content: space-between; margin-top: 2rem; }
+  .page-nav a { color: var(--primary); text-decoration: none; font-weight: 600; }
+
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .problem-grid { grid-template-columns: 1fr 1fr; }
+    .diag-flow { flex-direction: column; }
+  }
+</style>
