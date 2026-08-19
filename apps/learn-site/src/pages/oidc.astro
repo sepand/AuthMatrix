@@ -13,10 +13,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           <li><a href="#what-is">What is OpenID Connect?</a></li>
           <li><a href="#saml-vs-oidc">SAML 2.0 vs OIDC vs OAuth 2.0</a></li>
           <li><a href="#actors">OIDC Actors</a></li>
-          <li><a href="#id-token">The ID Token</a></li>
+          <li><a href="#id-token">The ID Token Anatomy</a></li>
           <li><a href="#scopes">OIDC Standard Scopes</a></li>
-          <li><a href="#discovery">Dynamic Discovery &amp; BYOI</a></li>
-          <li><a href="#execution-flow">5-Step OIDC Flow</a></li>
+          <li><a href="#discovery">Dynamic Discovery &amp; BYOI Federation</a></li>
+          <li><a href="#execution-flow">5-Step OIDC Execution Flow</a></li>
           <li><a href="#response-types">Response Types &amp; Hybrid Flow</a></li>
         </ul>
         <hr class="toc-divider" />
@@ -28,38 +28,69 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
       <main class="content">
         <div class="page-header">
-          <span class="badge badge-intermediate">Intermediate &middot; 25 min</span>
+          <span class="badge badge-intermediate">Intermediate &middot; 30 min</span>
           <h1>OpenID Connect (OIDC)</h1>
-          <p class="lead">Understanding the identity layer on top of OAuth 2.0, solving the pseudo-authentication problem, ID Token verification, dynamic discovery, and BYOI federation.</p>
+          <p class="lead">Understanding the modern identity layer built on OAuth 2.0, solving the pseudo-authentication problem, ID Token verification, dynamic discovery, and internet-scale BYOI federation.</p>
         </div>
 
         <!-- PSEUDO AUTH -->
         <section id="pseudo-auth">
           <h2>The Pseudo-Authentication Problem</h2>
-          <p>Before OpenID Connect, developers attempted to use plain OAuth 2.0 access tokens to authenticate users. As documented by oauth.net:</p>
-          <blockquote>
-            "OAuth 2.0 is not an authentication protocol. Using an access token as proof of identity is like using a movie ticket as a passport: it proves you paid for a seat, but not who you are."
-          </blockquote>
+          <p>Before OpenID Connect, developers attempted to use raw OAuth 2.0 Access Tokens as proof of user identity. As documented by oauth.net:</p>
           
-          <div class="callout warning">
-            <strong>Why OAuth alone fails for authentication:</strong>
+          <div style="background:var(--surface); border:1px solid #fbbf24; border-radius:var(--radius); padding:1.5rem; margin:1.5rem 0;">
+            <div style="font-weight:700; color:#fbbf24; margin-bottom:0.75rem; font-size:1.05rem;">🎫 The Movie Ticket vs. Passport Analogy</div>
+            <p style="margin-bottom:0.75rem;"><strong>"Using an Access Token as proof of identity is like using a movie ticket as a passport:"</strong></p>
             <ul>
-              <li><strong>Audience Mismatch:</strong> An access token's audience (<code>aud</code>) is the API resource server, not the client application. A token issued for App A could be replayed to log into App B.</li>
-              <li><strong>Opaque Formatting:</strong> Access tokens are opaque blobs to the client application.</li>
-              <li><strong>No Standard Profile Schema:</strong> Different providers returned user profile data in custom, incompatible JSON shapes.</li>
+              <li><strong>Movie Ticket (Access Token):</strong> Proves someone paid for Seat 14B in Theater 3. The usher does not care <em>who</em> you are, only that you have a valid ticket to enter the room.</li>
+              <li><strong>Passport (ID Token):</strong> An official, tamper-proof credential issued by an authority stating your full legal name, date of birth, photo, and citizenship.</li>
             </ul>
           </div>
+
+          <h3>Why Raw OAuth Fails for Authentication:</h3>
+          <table>
+            <thead>
+              <tr><th>Vulnerability / Gap</th><th>Technical Cause</th><th>Security Consequence</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Audience Mismatch</strong></td>
+                <td>Access token audience (<code>aud</code>) is the backend Resource Server, not the Client application.</td>
+                <td><strong>Token Replay Attack:</strong> A malicious App A can take an Access Token issued to it and replay it to log into App B.</td>
+              </tr>
+              <tr>
+                <td><strong>Opaque Format</strong></td>
+                <td>Access tokens are opaque strings to the client application.</td>
+                <td>Client cannot safely inspect user claims, timestamps, or issuer signatures locally.</td>
+              </tr>
+              <tr>
+                <td><strong>No Standard User Info Schema</strong></td>
+                <td>Every provider returned profile data in incompatible JSON shapes.</td>
+                <td>Developers had to write custom parsers for Google, Facebook, GitHub, and Twitter.</td>
+              </tr>
+            </tbody>
+          </table>
         </section>
 
         <!-- WHAT IS -->
         <section id="what-is">
           <h2>What is OpenID Connect (OIDC Core 1.0)?</h2>
-          <p>OpenID Connect combined the best parts of OAuth 2.0, Facebook Connect, and SAML 2.0 to create a lightweight identity layer on top of OAuth 2.0:</p>
-          <ul>
-            <li><strong>ID Token:</strong> A cryptographically signed JWT intended specifically for the Client application.</li>
-            <li><strong>UserInfo Endpoint:</strong> Standardized REST endpoint (<code>/userinfo</code>) returning validated user claims.</li>
-            <li><strong>Dynamic Discovery:</strong> Metadata endpoint (<code>/.well-known/openid-configuration</code>) enabling internet-scale dynamic federation.</li>
-          </ul>
+          <p>OpenID Connect combined the best features of <strong>OAuth 2.0</strong>, <strong>Facebook Connect</strong>, and <strong>SAML 2.0</strong> to establish a standardized, lightweight identity layer:</p>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:1rem; margin:1.5rem 0;">
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">1. The ID Token</h3>
+              <p style="font-size:0.88rem; margin-bottom:0;">A cryptographically signed JWT intended exclusively for the Client application to prove the user authenticated.</p>
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">2. UserInfo Endpoint</h3>
+              <p style="font-size:0.88rem; margin-bottom:0;">Standardized REST endpoint (<code>GET /userinfo</code>) returning validated, normalized JSON user profile claims.</p>
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">3. Dynamic Discovery</h3>
+              <p style="font-size:0.88rem; margin-bottom:0;">JSON metadata at <code>/.well-known/openid-configuration</code> eliminating manual federation configuration.</p>
+            </div>
+          </div>
         </section>
 
         <!-- SAML VS OIDC -->
@@ -67,60 +98,68 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           <h2>SAML 2.0 vs OIDC vs OAuth 2.0</h2>
           <table>
             <thead>
-              <tr><th>Dimension</th><th>SAML 2.0</th><th>OAuth 2.0</th><th>OpenID Connect</th></tr>
+              <tr><th>Dimension</th><th>SAML 2.0</th><th>OAuth 2.0</th><th>OpenID Connect (OIDC)</th></tr>
             </thead>
             <tbody>
-              <tr><td><strong>Type</strong></td><td>Authentication / SSO</td><td>Delegated Authorization</td><td>Authentication &amp; Identity</td></tr>
-              <tr><td><strong>Token Format</strong></td><td>XML Assertion</td><td>Opaque or JWT</td><td>JSON Web Token (ID Token)</td></tr>
-              <tr><td><strong>Transport</strong></td><td>HTTP POST XML</td><td>HTTPS JSON</td><td>HTTPS JSON</td></tr>
-              <tr><td><strong>Discovery</strong></td><td>Manual XML metadata exchange</td><td>None (Vendor defined)</td><td>Dynamic Discovery (JSON)</td></tr>
-              <tr><td><strong>Mobile Ready</strong></td><td>Poor</td><td>Excellent</td><td>Excellent</td></tr>
+              <tr><td><strong>Protocol Purpose</strong></td><td>Enterprise SSO &amp; Federation</td><td>Delegated Authorization</td><td>Modern Identity &amp; SSO</td></tr>
+              <tr><td><strong>Token Format</strong></td><td>Signed XML Assertion</td><td>Opaque string or JWT</td><td>JSON Web Token (ID Token)</td></tr>
+              <tr><td><strong>Transport Layer</strong></td><td>HTTP POST XML Binding</td><td>HTTPS REST / JSON</td><td>HTTPS REST / JSON</td></tr>
+              <tr><td><strong>Metadata Discovery</strong></td><td>Manual XML file download</td><td>None (Vendor defined)</td><td>Dynamic Discovery JSON</td></tr>
+              <tr><td><strong>Mobile &amp; SPA Support</strong></td><td>Poor (Heavy XML payloads)</td><td>Excellent</td><td>Excellent</td></tr>
+              <tr><td><strong>Assurance Levels</strong></td><td>AuthnContextClassRef</td><td>None</td><td><code>acr</code> and <code>amr</code> claims</td></tr>
             </tbody>
           </table>
         </section>
 
         <!-- ACTORS -->
         <section id="actors">
-          <h2>OIDC Actors</h2>
+          <h2>OIDC Actors (Standard Terminology)</h2>
           <ul>
-            <li><strong>End-User (Resource Owner):</strong> The human being whose identity is being verified.</li>
-            <li><strong>Relying Party (RP / Client):</strong> The application requesting authentication.</li>
-            <li><strong>OpenID Provider (OP / Authorization Server):</strong> The identity provider authenticating the user and issuing ID tokens.</li>
+            <li><strong>End-User (Resource Owner):</strong> The human whose identity is being verified.</li>
+            <li><strong>Relying Party (RP / Client):</strong> The application requesting identity proof from the OpenID Provider.</li>
+            <li><strong>OpenID Provider (OP / Authorization Server):</strong> The identity server (Okta, Entra ID, Google) that authenticates the user and issues ID Tokens.</li>
           </ul>
         </section>
 
         <!-- ID TOKEN -->
         <section id="id-token">
-          <h2>The ID Token</h2>
-          <p>A signed JWT containing identity claims for the Relying Party:</p>
-          <pre><code>&#123;
+          <h2>The ID Token Anatomy (RFC 7519)</h2>
+          <p>The ID Token is a signed JSON Web Token containing standardized identity assertions:</p>
+
+          <pre><code><span class="c">// Decoded ID Token Payload (JSON)</span>
+&#123;
   "iss": "https://authorization-server.example.com",
   "sub": "usr_998877",
   "aud": "my_client_app_id",
   "exp": 1755003600,
   "iat": 1755000000,
   "nonce": "n-0S6_WzA2Mj",
-  "email": "janedoe@example.com",
-  "email_verified": true
+  "name": "Alice Chen",
+  "email": "alice@authmatrix.local",
+  "email_verified": true,
+  "roles": ["Admin"]
 &#125;</code></pre>
+
           <div class="callout danger">
-            <strong>Critical Rule:</strong> The ID Token is for the Client App. <strong>Never send the ID Token to backend API servers as a Bearer token!</strong> Send the Access Token instead.
+            <strong>⛔ Critical Security Rule:</strong>
+            <p><strong>The ID Token is intended solely for the Client Application.</strong> Never send the ID Token to backend API servers in the <code>Authorization: Bearer</code> header. Backend APIs should only receive Access Tokens!</p>
           </div>
         </section>
 
         <!-- SCOPES -->
         <section id="scopes">
-          <h2>OIDC Standard Scopes</h2>
+          <h2>OIDC Standard Scopes &amp; Claims Matrix</h2>
           <table>
             <thead>
-              <tr><th>Scope</th><th>Claims Returned</th></tr>
+              <tr><th>Scope</th><th>Required?</th><th>Standard Claims Released</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>openid</code></td><td>Required for OIDC. Returns <code>sub</code> claim.</td></tr>
-              <tr><td><code>profile</code></td><td><code>name</code>, <code>family_name</code>, <code>given_name</code>, <code>picture</code>, <code>locale</code></td></tr>
-              <tr><td><code>email</code></td><td><code>email</code>, <code>email_verified</code></td></tr>
-              <tr><td><code>phone</code></td><td><code>phone_number</code>, <code>phone_number_verified</code></td></tr>
-              <tr><td><code>offline_access</code></td><td>Requests a Refresh Token for long-term access.</td></tr>
+              <tr><td><code>openid</code></td><td>&#9989; Mandatory</td><td><code>sub</code> (Subject identifier)</td></tr>
+              <tr><td><code>profile</code></td><td>Optional</td><td><code>name</code>, <code>family_name</code>, <code>given_name</code>, <code>picture</code>, <code>locale</code>, <code>zoneinfo</code></td></tr>
+              <tr><td><code>email</code></td><td>Optional</td><td><code>email</code>, <code>email_verified</code></td></tr>
+              <tr><td><code>phone</code></td><td>Optional</td><td><code>phone_number</code>, <code>phone_number_verified</code></td></tr>
+              <tr><td><code>address</code></td><td>Optional</td><td><code>formatted</code>, <code>street_address</code>, <code>locality</code>, <code>postal_code</code>, <code>country</code></td></tr>
+              <tr><td><code>offline_access</code></td><td>Optional</td><td>Issues a Refresh Token for offline session maintenance</td></tr>
             </tbody>
           </table>
         </section>
@@ -128,7 +167,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <!-- DISCOVERY -->
         <section id="discovery">
           <h2>Dynamic Discovery &amp; BYOI (Bring Your Own Identity)</h2>
-          <p>Unlike SAML's manual metadata files, OIDC enables internet-scale dynamic federation via <code>/.well-known/openid-configuration</code>:</p>
+          <p>OIDC enables internet-scale dynamic federation without pre-sharing XML certificates. An application can discover everything about an IdP by querying <code>/.well-known/openid-configuration</code>:</p>
+
           <pre><code>GET /.well-known/openid-configuration HTTP/1.1
 Host: accounts.example.com
 
@@ -140,14 +180,25 @@ Host: accounts.example.com
   "userinfo_endpoint": "https://accounts.example.com/oauth2/v1/userinfo",
   "jwks_uri": "https://accounts.example.com/oauth2/v1/keys",
   "response_types_supported": ["code", "id_token", "code id_token"],
+  "subject_types_supported": ["public", "pairwise"],
   "id_token_signing_alg_values_supported": ["RS256"]
 &#125;</code></pre>
+
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; margin:1.5rem 0;">
+            <div style="font-weight:700; color:var(--primary); margin-bottom:0.5rem; font-size:1.05rem;">🌐 How BYOI (Bring Your Own Identity) Works</div>
+            <ol style="margin-bottom:0; line-height:1.7;">
+              <li>User types their corporate email: <code>alice@acmecorp.com</code>.</li>
+              <li>App extracts domain <code>acmecorp.com</code> and fetches <code>https://acmecorp.com/.well-known/openid-configuration</code>.</li>
+              <li>App dynamically discovers Acme's authorization and JWKS endpoints.</li>
+              <li>User logs in at Acme IdP and returns with an ID Token signed by Acme's public keys.</li>
+            </ol>
+          </div>
         </section>
 
         <!-- EXECUTION FLOW -->
         <section id="execution-flow">
           <h2>5-Step OpenID Connect Flow</h2>
-          
+
           <pre class="mermaid">
 sequenceDiagram
     autonumber
@@ -187,16 +238,16 @@ sequenceDiagram
 
         <!-- RESPONSE TYPES -->
         <section id="response-types">
-          <h2>OIDC Response Types &amp; Hybrid Flow</h2>
+          <h2>OIDC Response Types &amp; Hybrid Flow Matrix</h2>
           <table>
             <thead>
-              <tr><th><code>response_type</code></th><th>Flow Category</th><th>Returned in Front Channel</th></tr>
+              <tr><th><code>response_type</code></th><th>Flow Category</th><th>Artifacts in Front-Channel</th><th>Artifacts in Back-Channel</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>code</code></td><td>Authorization Code Flow</td><td><code>code</code></td></tr>
-              <tr><td><code>id_token</code></td><td>Implicit Flow (Identity Only)</td><td><code>id_token</code></td></tr>
-              <tr><td><code>code id_token</code></td><td>Hybrid Flow</td><td><code>code</code>, <code>id_token</code></td></tr>
-              <tr><td><code>code id_token token</code></td><td>Hybrid Flow (Full)</td><td><code>code</code>, <code>id_token</code>, <code>access_token</code></td></tr>
+              <tr><td><code>code</code></td><td>Authorization Code Flow</td><td><code>code</code></td><td><code>id_token</code>, <code>access_token</code></td></tr>
+              <tr><td><code>id_token</code></td><td>Implicit Flow (Identity Only)</td><td><code>id_token</code></td><td>None</td></tr>
+              <tr><td><code>code id_token</code></td><td>Hybrid Flow</td><td><code>code</code>, <code>id_token</code></td><td><code>access_token</code>, <code>refresh_token</code></td></tr>
+              <tr><td><code>code id_token token</code></td><td>Hybrid Flow (Full)</td><td><code>code</code>, <code>id_token</code>, <code>access_token</code></td><td><code>refresh_token</code></td></tr>
             </tbody>
           </table>
         </section>

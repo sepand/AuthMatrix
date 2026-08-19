@@ -13,8 +13,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           <li><a href="#what-is">What is OAuth 2.0?</a></li>
           <li><a href="#actors">The Four Actors</a></li>
           <li><a href="#api-keys-vs-oauth">API Keys vs OAuth Tokens</a></li>
-          <li><a href="#scopes">Scopes &amp; Consent</a></li>
+          <li><a href="#scopes">Scopes &amp; User Consent</a></li>
           <li><a href="#clients">Public vs Confidential Clients</a></li>
+          <li><a href="#client-trust">Client Trust &amp; App Models</a></li>
           <li><a href="#channels">Front Channel vs Back Channel</a></li>
           <li><a href="#framework-variance">Framework vs Protocol Variance</a></li>
           <li><a href="#endpoints">OAuth Endpoints</a></li>
@@ -29,62 +30,84 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
       <main class="content">
         <div class="page-header">
-          <span class="badge badge-beginner">Beginner &middot; 20 min</span>
+          <span class="badge badge-beginner">Beginner &middot; 25 min</span>
           <h1>OAuth 2.0 Fundamentals</h1>
-          <p class="lead">Understanding delegated authorization, the password anti-pattern, actor topologies, token consumers, and modern security best practices under RFC 6749 and RFC 9700.</p>
+          <p class="lead">Understanding delegated authorization, the password anti-pattern, actor topologies, client trust models, token consumers, and modern security best practices under RFC 6749 and RFC 9700.</p>
         </div>
 
         <!-- PROBLEM -->
         <section id="problem">
-          <h2>The Problem OAuth Solves</h2>
-          <p>Before OAuth, if a third-party application needed access to a user's data on another service (e.g., printing contacts or managing calendars), it asked the user for their raw username and password. This is known as the <strong>password anti-pattern</strong>.</p>
-          <div class="callout danger">
-            <strong>⚠️ Hazards of the Password Anti-Pattern:</strong>
-            <ul>
-              <li><strong>Over-Privileged Access:</strong> The third-party application receives full access to the user's entire account.</li>
-              <li><strong>Irrevocability:</strong> The user cannot revoke access from a single app without changing their master password.</li>
-              <li><strong>Credential Compromise:</strong> If the third-party application is breached, the user's primary password is leaked.</li>
+          <h2>The Problem OAuth Solves: The Password Anti-Pattern</h2>
+          <p>Before OAuth, if a third-party application (e.g., Yelp or a photo printing service) needed access to a user's data on another platform (e.g., Google Contacts or Flickr), the third-party app asked the user for their raw username and password.</p>
+
+          <div style="background:var(--surface); border:1px solid #f87171; border-radius:var(--radius); padding:1.5rem; margin:1.5rem 0;">
+            <div style="font-weight:700; color:#f87171; margin-bottom:0.75rem; font-size:1.05rem;">⛔ The Password Anti-Pattern (Legacy Approach)</div>
+            <p style="margin-bottom:0.5rem; font-size:0.95rem;">"Enter your Google Email and Password so PhotoPrint can download your albums:"</p>
+            <div style="background:#070c14; border:1px solid var(--border); padding:1rem; border-radius:4px; font-family:var(--font-mono); font-size:0.85rem; margin-bottom:1rem;">
+              Username: user@gmail.com<br/>
+              Password: &bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;
+            </div>
+            <ul style="margin:0; font-size:0.9rem; line-height:1.6;">
+              <li><strong>Full Account Takeover:</strong> PhotoPrint gains unrestricted access to all your Gmail, Drive files, and Search history.</li>
+              <li><strong>Cannot Revoke:</strong> To revoke PhotoPrint's access, you must change your master Google password, breaking all other apps.</li>
+              <li><strong>Stored in Plaintext:</strong> Third-party apps stored user passwords in plaintext or reversible encryption to perform background syncing.</li>
             </ul>
           </div>
         </section>
 
         <!-- WHAT IS -->
         <section id="what-is">
-          <h2>What is OAuth 2.0?</h2>
-          <p>According to <strong>RFC 6749</strong>:</p>
+          <h2>What is OAuth 2.0? (RFC 6749)</h2>
           <blockquote>
             "The OAuth 2.0 authorization framework enables a third-party application to obtain limited access to an HTTP service, either on behalf of a resource owner by orchestrating an approval interaction between the resource owner and the HTTP service, or by allowing the third-party application to obtain access on its own behalf."
           </blockquote>
-          <p>A classic analogy is the <strong>valet key</strong> for an automobile. A valet key grants the parking attendant permission to start the engine and drive the vehicle, but does not open the trunk or glovebox, and is returned after use.</p>
+
+          <div style="background:var(--surface); border:1px solid var(--primary); border-radius:var(--radius); padding:1.5rem; margin:1.5rem 0;">
+            <div style="font-weight:700; color:var(--primary); margin-bottom:0.75rem; font-size:1.05rem;">🚗 The Valet Key Analogy</div>
+            <p style="margin-bottom:0.75rem;">When you give a <strong>valet key</strong> to a parking attendant:</p>
+            <ul>
+              <li><strong>Limited Access:</strong> The valet can start the engine and park the car, but cannot open the locked trunk or glovebox.</li>
+              <li><strong>Short Duration:</strong> The valet key is used only while parking and returned immediately after.</li>
+              <li><strong>No Master Key:</strong> You never hand over your master key or house keys on the keyring.</li>
+            </ul>
+            <p style="margin-top:0.75rem; margin-bottom:0;">In OAuth 2.0, the <strong>Access Token</strong> is the digital valet key: it grants scoped, temporary, revocable access to specific API endpoints without ever disclosing the user's master credentials.</p>
+          </div>
         </section>
 
         <!-- ACTORS -->
         <section id="actors">
           <h2>The Four OAuth Actors (RFC 6749 Section 1.1)</h2>
-          <div style="display:flex; flex-direction:column; gap:1rem; margin:1.5rem 0;">
-            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-              <h3 style="color:var(--primary); margin-top:0;">1. Resource Owner (The User)</h3>
-              <p>An entity capable of granting access to a protected resource (e.g., the end-user).</p>
+          <p>Every OAuth 2.0 architecture revolves around 4 distinct roles:</p>
+          
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:1rem; margin:1.5rem 0;">
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0; font-size:1rem;">1. Resource Owner</h3>
+              <p style="font-size:0.88rem; color:var(--muted);"><strong>The User (e.g. Alice)</strong></p>
+              <p style="font-size:0.88rem; margin-bottom:0;">The human entity that owns the data and has authority to grant access to it.</p>
             </div>
-            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-              <h3 style="color:var(--primary); margin-top:0;">2. Resource Server (The Protected API)</h3>
-              <p>The server hosting protected user resources that validates and accepts OAuth Bearer tokens.</p>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0; font-size:1rem;">2. Client</h3>
+              <p style="font-size:0.88rem; color:var(--muted);"><strong>The Application (e.g. PhotoPrint App)</strong></p>
+              <p style="font-size:0.88rem; margin-bottom:0;">The application requesting access to protected resources on behalf of the user.</p>
             </div>
-            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-              <h3 style="color:var(--primary); margin-top:0;">3. Client (The Application)</h3>
-              <p>The application making protected resource requests on behalf of the Resource Owner.</p>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0; font-size:1rem;">3. Authorization Server</h3>
+              <p style="font-size:0.88rem; color:var(--muted);"><strong>The IdP (e.g. Okta, Entra ID, Google)</strong></p>
+              <p style="font-size:0.88rem; margin-bottom:0;">Authenticates the Resource Owner, prompts for consent, and mints cryptographic tokens.</p>
             </div>
-            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-              <h3 style="color:var(--primary); margin-top:0;">4. Authorization Server (Identity Provider)</h3>
-              <p>The server issuing access tokens to the Client after successfully authenticating the Resource Owner and obtaining authorization.</p>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0; font-size:1rem;">4. Resource Server</h3>
+              <p style="font-size:0.88rem; color:var(--muted);"><strong>The Protected API (e.g. Photo Storage API)</strong></p>
+              <p style="font-size:0.88rem; margin-bottom:0;">Hosts protected resources and validates incoming Bearer access tokens before serving data.</p>
             </div>
           </div>
         </section>
 
         <!-- API KEYS VS OAUTH -->
         <section id="api-keys-vs-oauth">
-          <h2>API Keys vs OAuth 2.0 Tokens</h2>
+          <h2>API Keys vs OAuth 2.0 Bearer Tokens</h2>
           <p>Why static API keys fail for enterprise applications compared to OAuth tokens:</p>
+
           <pre><code><span class="c">// 1. Static API Key Request (Insecure: static, broad, no user context)</span>
 GET /api/reports HTTP/1.1
 Host: api.example.com
@@ -93,17 +116,18 @@ X-API-Key: secret_live_abcdef123456789
 <span class="c">// 2. OAuth 2.0 Bearer Token Request (Secure: scoped, short-lived, signed)</span>
 GET /api/reports HTTP/1.1
 Host: api.example.com
-Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...</code></pre>
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfMTIzIiwic2NvcGUiOiJyZWFkOnJlcG9ydHMiLCJleHAiOjE3NTUwMDM2MDB9...</code></pre>
 
           <table>
             <thead>
               <tr><th>Security Dimension</th><th>Static API Key</th><th>OAuth 2.0 Bearer Token</th></tr>
             </thead>
             <tbody>
-              <tr><td><strong>User Context</strong></td><td>None (Application-level only)</td><td>Bound to specific user (<code>sub</code> claim)</td></tr>
-              <tr><td><strong>Lifetime</strong></td><td>Long-lived / Indefinite</td><td>Short-lived (15–60 mins)</td></tr>
-              <tr><td><strong>Revocation</strong></td><td>Hard (Requires code redeploy)</td><td>Instantaneous via token revocation or expiration</td></tr>
-              <tr><td><strong>Scopes</strong></td><td>Coarse / All-or-nothing</td><td>Granular permissions (<code>read:reports</code>)</td></tr>
+              <tr><td><strong>User Identity &amp; Context</strong></td><td>None (Application-level only)</td><td>Bound to specific user (<code>sub</code> claim)</td></tr>
+              <tr><td><strong>Token Lifetime</strong></td><td>Indefinite / Months (Hard to rotate)</td><td>Short-lived (15–60 mins) with refresh tokens</td></tr>
+              <tr><td><strong>Granular Authorization</strong></td><td>Coarse / All-or-nothing access</td><td>Fine-grained scopes (<code>read:reports</code>, <code>write:users</code>)</td></tr>
+              <tr><td><strong>Revocation Impact</strong></td><td>Catastrophic: Breaks all services sharing key</td><td>Granular: Revoke single user session without affecting others</td></tr>
+              <tr><td><strong>Cryptographic Integrity</strong></td><td>None: Shared symmetric string</td><td>Asymmetric digital signature (RS256 via public JWKS)</td></tr>
             </tbody>
           </table>
         </section>
@@ -185,15 +209,59 @@ Host: accounts.example.com</code></pre>
 
         <!-- CLIENTS -->
         <section id="clients">
-          <h2>Public vs Confidential Clients</h2>
-          <p>RFC 6749 categorizes clients by their ability to keep credentials confidential:</p>
-          <ul>
-            <li><strong>Confidential Clients:</strong> Server-side web applications running in secure backend environments (Node.js, Java, Python). They can safely maintain a <code>client_secret</code>.</li>
-            <li><strong>Public Clients:</strong> Single Page Apps (React, Vue) or Native Mobile Apps (iOS, Android). The source code and binary can be decompiled; <strong>they can NEVER keep a secret</strong>.</li>
-          </ul>
-          <div class="callout danger">
-            <strong>⚠️ Security Rule:</strong> Never distribute a <code>client_secret</code> in client-side JavaScript or an app distributed through public App Stores. Use <strong>Authorization Code + PKCE</strong> instead.
+          <h2>Public vs Confidential Clients (RFC 6749 Section 2.1)</h2>
+          <p>Clients are classified strictly by their ability to maintain the confidentiality of their credentials:</p>
+          
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1rem; margin:1.5rem 0;">
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">Confidential (Private) Clients</h3>
+              <p><strong>Examples:</strong> Node.js, Express, Spring Boot, ASP.NET running in secure server environments.</p>
+              <ul>
+                <li>Can securely maintain a <code>client_secret</code> in server environment variables.</li>
+                <li>Performs back-channel token exchanges with client authentication (Basic Auth or POST body).</li>
+                <li>Eligible for Client Credentials Flow (M2M).</li>
+              </ul>
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--danger); margin-top:0;">Public Clients</h3>
+              <p><strong>Examples:</strong> React/Vue Single Page Apps, iOS/Android mobile apps, desktop apps.</p>
+              <ul>
+                <li><strong>Cannot keep a secret:</strong> Source code is viewable via browser dev tools or binary decompilation.</li>
+                <li><strong>Must NOT have a <code>client_secret</code>:</strong> Never bake a secret into an app shipped via App Store or npm bundle.</li>
+                <li><strong>Must use PKCE (RFC 7636)</strong> to secure authorization code exchange.</li>
+              </ul>
+            </div>
           </div>
+        </section>
+
+        <!-- CLIENT TRUST -->
+        <section id="client-trust">
+          <h2>Client Trust &amp; Application Models</h2>
+          
+          <h3>1. Redirect Model vs Embedded Model</h3>
+          <table>
+            <thead>
+              <tr><th>Model</th><th>How It Works</th><th>Security Posture &amp; Best Practice</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Redirect Model (Standard)</strong></td>
+                <td>Client redirects user browser to IdP login page (e.g. <code>https://auth.company.com</code>).</td>
+                <td><strong>Recommended Gold Standard:</strong> Client never touches user passwords; IdP manages MFA, passkeys, and session cookies securely.</td>
+              </tr>
+              <tr>
+                <td><strong>Embedded Model (Direct SDK)</strong></td>
+                <td>Client renders custom input fields in its own UI and calls backend APIs (e.g. Okta Interaction Code Flow).</td>
+                <td><strong>High-Trust First-Party Only:</strong> Requires high trust; client app must be strictly audited to ensure credentials are not logged or exfiltrated.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>2. High-Trust First-Party vs Low-Trust Third-Party</h3>
+          <ul>
+            <li><strong>First-Party Apps:</strong> Developed by the same organization hosting the identity provider (e.g., Google Maps accessing Google Account). Often granted automatic consent or native embedded login experiences.</li>
+            <li><strong>Third-Party Apps:</strong> Built by external developers. <strong>Must always</strong> use the Redirect Model with explicit User Consent screens and PKCE.</li>
+          </ul>
         </section>
 
         <!-- CHANNELS -->
@@ -232,8 +300,13 @@ sequenceDiagram
           <h2>OAuth 2.0: Framework vs Protocol Variance</h2>
           <div class="callout warning">
             <strong>⚠️ Architectural Variance &amp; Normalization:</strong>
-            <p>OAuth 2.0 is defined as an <em>Authorization Framework</em> rather than a rigid protocol. As a result, vendors (Okta, Microsoft Entra ID, Ping, Auth0) implement parameter options, token payload formats, and role mappings differently.</p>
-            <p>Enterprise applications and API Gateways (such as Azure APIM) must implement <strong>claim normalization adapters</strong> to map vendor-specific claims (e.g. Okta <code>groups</code> vs Entra <code>roles</code>) into a unified permission model.</p>
+            <p>OAuth 2.0 is defined as an <em>Authorization Framework</em> rather than a rigid protocol. Because of this, identity vendors implement parameter options, token payload formats, and role mappings differently:</p>
+            <ul>
+              <li><strong>Okta:</strong> Often issues roles inside a custom <code>groups</code> claim array: <code>"groups": ["Admins", "Engineers"]</code>.</li>
+              <li><strong>Microsoft Entra ID:</strong> Issues roles inside an <code>roles</code> claim: <code>"roles": ["Admin.All", "Reports.Read"]</code>.</li>
+              <li><strong>Auth0:</strong> Uses namespaced custom claims: <code>"https://myapi.com/roles": ["admin"]</code>.</li>
+            </ul>
+            <p>Enterprise applications and API Gateways (such as Azure APIM) must implement <strong>claim normalization adapters</strong> to map vendor-specific claims into a unified internal permission model.</p>
           </div>
         </section>
 
@@ -251,12 +324,22 @@ sequenceDiagram
         <!-- SECURITY CHECKLIST -->
         <section id="security">
           <h2>Web Security 101 Checklist (RFC 9700)</h2>
-          <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem;">
-            <div>&#9989; <strong>Always use <code>state</code>:</strong> Cryptographic random string to guarantee flow integrity and defeat CSRF.</div>
-            <div>&#9989; <strong>Always use PKCE:</strong> Proof Key for Code Exchange (RFC 7636) for public and confidential clients.</div>
-            <div>&#9989; <strong>Strict Redirect URI Whitelisting:</strong> Validate exact URL matches to prevent token harvesting redirects.</div>
-            <div>&#9989; <strong>Bind <code>client_id</code>:</strong> Ensure token requests bind the grant code to the same client ID.</div>
-            <div>&#9989; <strong>Short Token Lifetimes:</strong> Use 15–60 minute access tokens with refresh token rotation.</div>
+          <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top:1rem;">
+            <div style="background:var(--surface); border:1px solid var(--border); padding:0.75rem 1rem; border-radius:var(--radius);">
+              &#9989; <strong>Always use <code>state</code> parameter:</strong> Generates a cryptographically random nonce stored in the client session before redirecting. Prevents Cross-Site Request Forgery (CSRF) login injection.
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:0.75rem 1rem; border-radius:var(--radius);">
+              &#9989; <strong>Always require PKCE (RFC 7636):</strong> Mandate Proof Key for Code Exchange for all public and confidential clients to eliminate authorization code interception attacks.
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:0.75rem 1rem; border-radius:var(--radius);">
+              &#9989; <strong>Strict Redirect URI Whitelisting:</strong> Reject wildcards and open redirectors. Validate exact scheme, domain, and path matching in the Authorization Server registration.
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:0.75rem 1rem; border-radius:var(--radius);">
+              &#9989; <strong>Bind <code>client_id</code> to Token Requests:</strong> The Authorization Server must verify that the client redeeming an authorization code is the exact same client to which the code was issued.
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:0.75rem 1rem; border-radius:var(--radius);">
+              &#9989; <strong>Short Token Lifetimes &amp; Refresh Rotation:</strong> Limit access tokens to 15–60 minutes. Invalidate refresh tokens on each use and revoke the entire token lineage if a reused token is detected.
+            </div>
           </div>
         </section>
 

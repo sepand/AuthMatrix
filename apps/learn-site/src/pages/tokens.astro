@@ -9,14 +9,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       <nav class="toc">
         <div class="toc-label">On this page</div>
         <ul>
-          <li><a href="#token-consumers">Token Types &amp; Consumers</a></li>
+          <li><a href="#token-consumers">Token Types &amp; Intended Consumers</a></li>
           <li><a href="#scopes-vs-claims">Scope vs Claim vs Response Type</a></li>
-          <li><a href="#jwt-structure">JWT Structure &amp; Tamper-Proofing</a></li>
-          <li><a href="#claims">Standard &amp; Custom Claims</a></li>
-          <li><a href="#signing">RS256 vs HS256 Signing</a></li>
-          <li><a href="#jwks">JWKS Verification</a></li>
+          <li><a href="#jwt-structure">JWT Anatomy &amp; Tamper-Proofing</a></li>
+          <li><a href="#claims">Standard &amp; Custom JWT Claims</a></li>
+          <li><a href="#signing">RS256 vs HS256 Cryptography</a></li>
+          <li><a href="#jwks">Dynamic JWKS Key Verification</a></li>
           <li><a href="#endpoints">The Four OAuth Endpoints</a></li>
-          <li><a href="#wam">Web Access Management (WAM)</a></li>
+          <li><a href="#wam">Web Access Management (WAM) Policies</a></li>
         </ul>
         <hr class="toc-divider" />
         <nav class="toc-nav">
@@ -27,14 +27,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
       <main class="content">
         <div class="page-header">
-          <span class="badge badge-advanced">Advanced &middot; 25 min</span>
+          <span class="badge badge-advanced">Advanced &middot; 30 min</span>
           <h1>Tokens, JWT, Claims &amp; Endpoints</h1>
-          <p class="lead">In-depth guide to token types, JWT validation, cryptographic signature verification (RS256 / JWKS), standard claims, and token introspection / revocation endpoints.</p>
+          <p class="lead">Deep dive into token architectures, JSON Web Token (JWT) verification, cryptographic signature verification (RS256 / JWKS), standard claims, introspection, revocation, and WAM policies.</p>
         </div>
 
         <!-- TOKEN CONSUMERS -->
         <section id="token-consumers">
           <h2>Token Types &amp; Intended Consumers</h2>
+          <p>Every token in the OAuth / OIDC ecosystem is minted for a specific consumer. Routing a token to the wrong consumer creates severe security vulnerabilities:</p>
 
           <pre class="mermaid">
 graph TD
@@ -64,23 +65,26 @@ graph TD
 
           <table>
             <thead>
-              <tr><th>Token Type</th><th>Intended Consumer</th><th>Security Purpose &amp; Rule</th></tr>
+              <tr><th>Token Type</th><th>Intended Consumer</th><th>Format</th><th>Security Invariant &amp; Lifetime</th></tr>
             </thead>
             <tbody>
               <tr>
                 <td><strong>Access Token</strong></td>
                 <td>Resource Server (API)</td>
-                <td>Presented in <code>Authorization: Bearer</code> headers. Grants access to protected endpoints. Never inspect inside client apps.</td>
+                <td>JWT or Opaque</td>
+                <td>Short-lived (15–60 min). Presented in <code>Authorization: Bearer</code> header. <strong>Never inspect inside client apps.</strong></td>
               </tr>
               <tr>
                 <td><strong>ID Token</strong></td>
                 <td>Client Application</td>
-                <td>Signed JWT proving user authentication. <strong>Never send to backend APIs as Bearer tokens!</strong></td>
+                <td>Signed JWT</td>
+                <td>Short-lived (5–10 min). Proves user authentication. <strong>Never send to backend APIs as Bearer tokens!</strong></td>
               </tr>
               <tr>
                 <td><strong>Refresh Token</strong></td>
                 <td>Authorization Server</td>
-                <td>Long-lived credential used exclusively to fetch fresh access tokens. Stored securely in HTTP-only cookies or secret vaults.</td>
+                <td>Opaque string</td>
+                <td>Long-lived (days/weeks). Used exclusively to fetch fresh access tokens. Stored in HTTP-only cookies or secret vaults.</td>
               </tr>
             </tbody>
           </table>
@@ -88,93 +92,121 @@ graph TD
 
         <!-- SCOPES VS CLAIMS -->
         <section id="scopes-vs-claims">
-          <h2>Scope vs Claim vs Response Type</h2>
-          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin:1.5rem 0;">
-            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-              <h3 style="color:var(--primary); margin-top:0;">Scope</h3>
-              <p>Permissions requested by the client during authorization (e.g. <code>read:reports</code>, <code>openid</code>).</p>
+          <h2>Scope vs Claim vs Response Type: The 3 Pillars</h2>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:1rem; margin:1.5rem 0;">
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">1. Scope</h3>
+              <p style="font-size:0.85rem; color:var(--muted);"><strong>The Request (Authorization)</strong></p>
+              <p style="font-size:0.88rem; margin-bottom:0;">Permissions requested by the Client during the authorization request (e.g. <code>read:reports</code>, <code>openid</code>).</p>
             </div>
-            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-              <h3 style="color:var(--primary); margin-top:0;">Claim</h3>
-              <p>Key-value assertion packed inside a JWT payload about a user or context (e.g. <code>"sub": "123"</code>, <code>"roles": ["Admin"]</code>).</p>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">2. Claim</h3>
+              <p style="font-size:0.85rem; color:var(--muted);"><strong>The Assertion (Identity &amp; Context)</strong></p>
+              <p style="font-size:0.88rem; margin-bottom:0;">Key-value attribute packed inside a signed JWT payload (e.g. <code>"sub": "usr_123"</code>, <code>"roles": ["Admin"]</code>).</p>
             </div>
-            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
-              <h3 style="color:var(--primary); margin-top:0;">Response Type</h3>
-              <p>Instructs the Authorization Server what artifacts to return in the front-channel redirect (e.g. <code>code</code>, <code>id_token</code>).</p>
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1.25rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">3. Response Type</h3>
+              <p style="font-size:0.85rem; color:var(--muted);"><strong>The Protocol Instruction</strong></p>
+              <p style="font-size:0.88rem; margin-bottom:0;">Tells the IdP what token artifacts to return in the front-channel redirect (e.g. <code>code</code>, <code>id_token</code>).</p>
             </div>
           </div>
         </section>
 
         <!-- JWT STRUCTURE -->
         <section id="jwt-structure">
-          <h2>JWT Structure &amp; Tamper-Proofing (RFC 7519)</h2>
-          <p>A JSON Web Token consists of three base64url-encoded parts separated by periods: <code>header.payload.signature</code></p>
+          <h2>JWT Anatomy &amp; Tamper-Proofing (RFC 7519)</h2>
+          <p>A JSON Web Token consists of three base64url-encoded strings separated by periods: <code>header.payload.signature</code></p>
           
-          <pre><code><span class="c">// 1. HEADER (Base64URL encoded)</span>
+          <div style="background:#070c14; border:1px solid var(--border); padding:1.5rem; border-radius:var(--radius); margin:1.5rem 0; font-family:var(--font-mono); font-size:0.9rem;">
+            <div style="color:#f87171; word-break:break-all; margin-bottom:0.75rem;">
+              <span style="font-weight:700;">HEADER:</span> eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleV8yMDI2XzAxIn0
+            </div>
+            <div style="color:#c084fc; word-break:break-all; margin-bottom:0.75rem;">
+              <span style="font-weight:700;">PAYLOAD:</span> eyJpc3MiOiJodHRwczovL2F1dGhtYXRyaXgubG9jYWwiLCJzdWIiOiJ1c3JfYWxpY2VfMTIzIiwicm9sZXMiOlsiQWRtaW4iXX0
+            </div>
+            <div style="color:#38bdf8; word-break:break-all;">
+              <span style="font-weight:700;">SIGNATURE:</span> Td4k7wN5rXyZ_8Pq9LmVoA...
+            </div>
+          </div>
+
+          <pre><code><span class="c">// 1. HEADER (Specifies Algorithm and Key ID)</span>
 &#123;
   "alg": "RS256",
   "typ": "JWT",
   "kid": "key_2026_01"
 &#125;
 
-<span class="c">// 2. PAYLOAD (Base64URL encoded)</span>
+<span class="c">// 2. PAYLOAD (Identity and Access Claims)</span>
 &#123;
-  "iss": "https://authorization-server.example.com",
-  "sub": "usr_445566",
-  "aud": "https://api.example.com",
+  "iss": "https://authmatrix.local",
+  "sub": "usr_alice_123",
+  "aud": "https://api.authmatrix.local",
   "exp": 1755003600,
   "iat": 1755000000,
-  "roles": ["Manager"]
+  "roles": ["Admin"],
+  "permissions": ["read:reports", "write:users", "delete:audit"]
 &#125;
 
-<span class="c">// 3. SIGNATURE</span>
+<span class="c">// 3. SIGNATURE (Asymmetric RSA SHA-256)</span>
 RS256(Base64URL(Header) + "." + Base64URL(Payload), PrivateKey)</code></pre>
-          
+
           <div class="callout tip">
-            <strong>🔒 Tamper-Proof Security:</strong> If an attacker modifies even a single character in the Header or Payload, signature verification fails because the attacker lacks the private key.
+            <strong>🔒 Cryptographic Tamper-Proofing Demonstration:</strong>
+            <p>If an attacker modifies their role in the payload from <code>"roles": ["Developer"]</code> to <code>"roles": ["Admin"]</code>, the base64 payload changes. When the API verifies the signature using the IdP's public key, the mathematical hash check fails immediately, rejecting the forgery.</p>
           </div>
         </section>
 
         <!-- CLAIMS -->
         <section id="claims">
-          <h2>Standard JWT Claims (RFC 7519 Section 4.1)</h2>
+          <h2>Standard &amp; Custom JWT Claims</h2>
+          
+          <h3>1. Standard JWT Claims (RFC 7519 Section 4.1)</h3>
           <table>
             <thead>
-              <tr><th>Claim</th><th>Name</th><th>Description</th></tr>
+              <tr><th>Claim</th><th>Name</th><th>Verification Rule</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>iss</code></td><td>Issuer</td><td>Identifies the Authorization Server that created the token.</td></tr>
-              <tr><td><code>sub</code></td><td>Subject</td><td>Unique identifier of the resource owner / user.</td></tr>
-              <tr><td><code>aud</code></td><td>Audience</td><td>Intended recipient of the token (must match API identifier).</td></tr>
-              <tr><td><code>exp</code></td><td>Expiration</td><td>Unix timestamp after which the token is invalid.</td></tr>
-              <tr><td><code>nbf</code></td><td>Not Before</td><td>Unix timestamp before which the token must not be accepted.</td></tr>
-              <tr><td><code>iat</code></td><td>Issued At</td><td>Unix timestamp when the token was created.</td></tr>
-              <tr><td><code>jti</code></td><td>JWT ID</td><td>Unique token identifier used to prevent replay attacks.</td></tr>
+              <tr><td><code>iss</code></td><td>Issuer</td><td>Must match the exact URL of the Authorization Server.</td></tr>
+              <tr><td><code>sub</code></td><td>Subject</td><td>Unique permanent identifier of the user/entity.</td></tr>
+              <tr><td><code>aud</code></td><td>Audience</td><td>Must match the API identifier / Client ID. Rejects misrouted tokens.</td></tr>
+              <tr><td><code>exp</code></td><td>Expiration</td><td>Unix timestamp. Reject if <code>now() &gt; exp</code>.</td></tr>
+              <tr><td><code>nbf</code></td><td>Not Before</td><td>Unix timestamp. Reject if <code>now() &lt; nbf</code>.</td></tr>
+              <tr><td><code>iat</code></td><td>Issued At</td><td>Unix timestamp indicating token creation time.</td></tr>
+              <tr><td><code>jti</code></td><td>JWT ID</td><td>Unique token GUID used to prevent replay attacks.</td></tr>
             </tbody>
           </table>
+
+          <h3>2. Custom Application Claims</h3>
+          <p>Modern applications embed structured authorization context directly into the JWT payload:</p>
+          <ul>
+            <li><code>roles: ["Admin", "SecurityLead"]</code> (RBAC group assignments)</li>
+            <li><code>permissions: ["read:reports", "delete:users"]</code> (Fine-grained Least Privilege)</li>
+            <li><code>tenant_id: "org_acme_corp_88"</code> (Multi-tenant data isolation)</li>
+          </ul>
         </section>
 
         <!-- SIGNING -->
         <section id="signing">
-          <h2>RS256 vs HS256 Signature Verification</h2>
+          <h2>RS256 vs HS256 Cryptography</h2>
           <table>
             <thead>
               <tr><th>Dimension</th><th>HS256 (Symmetric)</th><th>RS256 (Asymmetric)</th></tr>
             </thead>
             <tbody>
-              <tr><td><strong>Key Type</strong></td><td>Single Shared Secret</td><td>Private Key (Signs) + Public Key (Verifies)</td></tr>
-              <tr><td><strong>Security Model</strong></td><td>Risky: All APIs need the secret</td><td>Ideal: Only IdP holds private key; APIs verify via public JWKS</td></tr>
-              <tr><td><strong>Enterprise Standard</strong></td><td>Internal services only</td><td>Recommended standard for all public &amp; multi-service architectures</td></tr>
+              <tr><td><strong>Key Mechanism</strong></td><td>Single Shared Secret Key</td><td>Private Key (Signs) + Public Key (Verifies)</td></tr>
+              <tr><td><strong>Key Distribution Risk</strong></td><td><strong>High Risk:</strong> Every API service must store the shared secret. If one API is breached, the attacker can mint tokens for all services.</td><td><strong>Zero Secret Leakage:</strong> Only the IdP holds the private key. APIs only download public keys.</td></tr>
+              <tr><td><strong>Enterprise Standard</strong></td><td>Internal legacy services only</td><td><strong>Industry Gold Standard</strong> for all microservices &amp; cloud architectures.</td></tr>
             </tbody>
           </table>
         </section>
 
         <!-- JWKS -->
         <section id="jwks">
-          <h2>JWKS Verification (RFC 7517)</h2>
-          <p>Resource servers verify incoming tokens by dynamically retrieving the IdP's public keys from <code>/.well-known/jwks.json</code>:</p>
+          <h2>Dynamic JWKS Key Verification (RFC 7517)</h2>
+          <p>APIs verify incoming tokens without calling the Authorization Server on every request. Instead, they dynamically download public keys from <code>/.well-known/jwks.json</code>:</p>
+
           <pre><code>GET /.well-known/jwks.json HTTP/1.1
-Host: authorization-server.example.com
+Host: accounts.example.com
 
 <span class="c">// Response</span>
 &#123;
@@ -189,13 +221,15 @@ Host: authorization-server.example.com
     &#125;
   ]
 &#125;</code></pre>
+          <p><strong>Key Rotation:</strong> When an IdP rotates signing keys, it publishes the new key in the JWKS array. The API matches the JWT header's <code>kid</code> (Key ID) to the JWKS key without downtime.</p>
         </section>
 
         <!-- ENDPOINTS -->
         <section id="endpoints">
           <h2>The Four OAuth Endpoints</h2>
-          
+
           <h3>1. Token Introspection (RFC 7662)</h3>
+          <p>Allows Resource Servers to validate opaque tokens or check real-time revocation status:</p>
           <pre><code>POST /introspect HTTP/1.1
 Host: authorization-server.example.com
 Content-Type: application/x-www-form-urlencoded
@@ -206,13 +240,14 @@ token=2YotnFZFEjr1zCsicMWpAA
 <span class="c">// Response</span>
 &#123;
   "active": true,
-  "scope": "read:reports",
+  "scope": "read:reports write:users",
   "client_id": "client_app_123",
-  "username": "janedoe",
+  "sub": "usr_alice_123",
   "exp": 1755003600
 &#125;</code></pre>
 
           <h3>2. Token Revocation (RFC 7009)</h3>
+          <p>Explicitly invalidates an active token upon user logout:</p>
           <pre><code>POST /revoke HTTP/1.1
 Host: authorization-server.example.com
 Content-Type: application/x-www-form-urlencoded
@@ -223,12 +258,16 @@ token=8xLOxBtZp8&amp;token_type_hint=refresh_token</code></pre>
         <!-- WAM -->
         <section id="wam">
           <h2>Web Access Management (WAM) Policies</h2>
-          <p>Modern Web Access Management engines evaluate token claims and environmental signals in real time before granting access to sensitive business operations:</p>
-          <ul>
-            <li><strong>User Context:</strong> Evaluates <code>sub</code>, <code>roles</code>, and <code>permissions</code>.</li>
-            <li><strong>Resource Context:</strong> Evaluates the requested URI (e.g. <code>/api/protected/audit</code>) and HTTP verb (<code>DELETE</code>).</li>
-            <li><strong>Risk Signals:</strong> IP geolocation, device health compliance, and MFA assurance levels (<code>acr</code> / <code>amr</code>).</li>
-          </ul>
+          <p>Modern Zero Trust policy engines evaluate token claims and environmental signals in real time before granting access to sensitive business operations:</p>
+
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; margin:1.5rem 0;">
+            <div style="font-weight:700; color:var(--primary); margin-bottom:0.75rem; font-size:1.05rem;">🛡️ WAM Real-Time Policy Evaluation Matrix</div>
+            <ul style="margin-bottom:0; line-height:1.7;">
+              <li><strong>User Identity Context:</strong> <code>sub</code>, <code>roles</code>, verified email domain.</li>
+              <li><strong>Resource Context:</strong> Requested endpoint (e.g. <code>DELETE /api/protected/audit</code>) and required permission (<code>delete:audit</code>).</li>
+              <li><strong>Environmental Risk Signals:</strong> IP Geolocation anomaly, corporate managed device status, and MFA assurance level (<code>acr</code> / <code>amr</code>).</li>
+            </ul>
+          </div>
         </section>
 
         <footer class="page-footer">
