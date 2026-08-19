@@ -142,6 +142,27 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...</code></pre>
             <li><strong>Front Channel:</strong> Carried out via user browser redirects (e.g., <code>GET /authorize</code>). Visible in browser history and logs; must only carry transient authorization codes, never raw tokens or client secrets.</li>
             <li><strong>Back Channel:</strong> Direct server-to-server TLS encrypted HTTPS POST requests (e.g., <code>POST /token</code>). Used for exchanging codes for access tokens and validating credentials.</li>
           </ul>
+
+          <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor RO as 👤 Resource Owner (User)
+    participant C as 📱 Client App (SPA / Web / Mobile)
+    participant AS as 🔑 Authorization Server (IdP)
+    participant RS as 🗄️ Resource Server (API)
+
+    Note over RO,AS: 🌐 FRONT CHANNEL (Browser Redirects / Visible)
+    RO-&gt;&gt;C: 1. Initiate Action / Login
+    C-&gt;&gt;AS: 2. Redirect to GET /authorize (scope, state, client_id)
+    RO-&gt;&gt;AS: 3. Authenticate &amp; Grant Consent
+    AS--&gt;&gt;C: 4. 302 Redirect to redirect_uri with code &amp; state
+
+    Note over C,RS: 🔒 BACK CHANNEL (Direct TLS Encrypted HTTPS POST)
+    C-&gt;&gt;AS: 5. POST /token (grant_type=authorization_code, code, client_secret/PKCE)
+    AS--&gt;&gt;C: 6. 200 OK (access_token, id_token, refresh_token)
+    C-&gt;&gt;RS: 7. GET /api/data (Authorization: Bearer &lt;access_token&gt;)
+    RS--&gt;&gt;C: 8. 200 OK (Protected JSON Payload)
+          </pre>
         </section>
 
         <!-- FRAMEWORK VARIANCE -->

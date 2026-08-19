@@ -40,6 +40,23 @@ const nav = [
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <title>{title} | AuthMatrix IAM Masterclass</title>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: 'dark',
+        themeVariables: {
+          darkMode: true,
+          background: '#090d16',
+          primaryColor: '#1e293b',
+          primaryTextColor: '#f3f4f6',
+          primaryBorderColor: '#38bdf8',
+          lineColor: '#38bdf8',
+          secondaryColor: '#111827',
+          tertiaryColor: '#0f172a',
+        }
+      });
+    </script>
   </head>
   <body>
 
@@ -392,6 +409,23 @@ const nav = [
   .callout.warning { border-color: var(--warning); background: var(--warning-dim); }
   .callout.danger  { border-color: var(--danger);  background: var(--danger-dim);  }
 
+  /* ── Mermaid Diagrams ───────────────────────────────────────────────── */
+  .mermaid {
+    background: var(--surface) !important;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    display: flex;
+    justify-content: center;
+    overflow-x: auto;
+    font-family: inherit;
+  }
+  .mermaid svg {
+    max-width: 100%;
+    height: auto;
+  }
+
   /* ── Badges ─────────────────────────────────────────────────────────── */
   .badge {
     display: inline-block;
@@ -526,8 +560,8 @@ const nav = [
     headings.forEach(h => io.observe(h));
   }
 
-  // Copy-to-clipboard on all pre blocks
-  document.querySelectorAll('.content pre').forEach(pre => {
+  // Copy-to-clipboard on code pre blocks (ignore mermaid diagrams)
+  document.querySelectorAll('.content pre:not(.mermaid)').forEach(pre => {
     const btn = Object.assign(document.createElement('button'), {
       textContent: 'Copy',
       className: 'copy-btn'

@@ -156,6 +156,35 @@ export const requireAuth = (req: AuthenticatedRequest, res: Response, next: Next
         <!-- 6. APIM -->
         <section id="apim">
           <h2>6. Azure APIM Gateway Policy</h2>
+
+          <pre class="mermaid">
+graph LR
+    subgraph Clients["Clients"]
+        UserBrowser["🌐 Browser (React SPA)"]
+        BackendDaemon["🤖 Backend Service"]
+    end
+
+    subgraph APIM["🛡️ Azure API Management Gateway"]
+        Strip["1. Strip untrusted client headers<br/>(x-user-id, x-user-roles)"]
+        Validate["2. Validate JWT Signature &amp; Expiration<br/>(against Entra ID / Okta JWKS)"]
+        Normalize["3. Normalize Claims<br/>(roles / groups -&gt; x-user-roles)"]
+    end
+
+    subgraph Backend["⚡ Express API Backend (localhost:4000)"]
+        AuthMiddleware["requireAuth Middleware<br/>(reads trusted x-user-* headers)"]
+        PermMiddleware["requirePermission Middleware<br/>(checks fine-grained Least Privilege)"]
+        Endpoints["Target Route Handler<br/>(e.g. DELETE /api/protected/users/:id)"]
+    end
+
+    UserBrowser --&gt;|"Bearer Token (Entra/Okta)"| Strip
+    BackendDaemon --&gt;|"Bearer Token (M2M)"| Strip
+    Strip --&gt; Validate
+    Validate --&gt; Normalize
+    Normalize --&gt;|"Injected x-user-id, x-user-roles"| AuthMiddleware
+    AuthMiddleware --&gt; PermMiddleware
+    PermMiddleware --&gt; Endpoints
+          </pre>
+
           <p>Inbound XML policy snippet for dual-IdP JWT validation and header injection:</p>
           <pre><code>&lt;policies&gt;
     &lt;inbound&gt;

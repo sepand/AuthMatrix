@@ -85,6 +85,29 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <section id="auth-code">
           <h2>Authorization Code Flow (Golden Standard - 3-Legged)</h2>
           <p>The 3-legged authorization code grant is the recommended standard for user authentication:</p>
+
+          <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User as 👤 End User
+    participant Client as 💻 Public Client (SPA / App)
+    participant AuthServer as 🛡️ Authorization Server
+    participant API as ⚡ Protected API / Gateway
+
+    Note over Client: Generate code_verifier &amp; code_challenge (S256)
+    Client-&gt;&gt;AuthServer: 1. GET /authorize?response_type=code&amp;code_challenge=...
+    AuthServer-&gt;&gt;User: 2. Prompts Login &amp; Consent Screen
+    User-&gt;&gt;AuthServer: 3. Submits Credentials &amp; Consents
+    AuthServer--&gt;&gt;Client: 4. 302 Redirect with ?code=SplxlOBeZQQYbYS6WxSbIA&amp;state=...
+
+    Note over Client,AuthServer: Back Channel Exchange
+    Client-&gt;&gt;AuthServer: 5. POST /token (grant_type=authorization_code, code, code_verifier)
+    Note over AuthServer: Verify SHA256(code_verifier) == code_challenge
+    AuthServer--&gt;&gt;Client: 6. 200 OK &#123; access_token, id_token, refresh_token &#125;
+
+    Client-&gt;&gt;API: 7. GET /api/resource (Authorization: Bearer &lt;access_token&gt;)
+    API--&gt;&gt;Client: 8. 200 OK (Protected JSON Data)
+          </pre>
           
           <pre><code><span class="c">// STEP 1: Front Channel Authorization Request</span>
 GET /authorize?
@@ -162,6 +185,24 @@ grant_type=authorization_code
         <section id="client-creds">
           <h2>Client Credentials Flow (RFC 6749 Section 4.4)</h2>
           <p>Used for machine-to-machine (M2M) communication without an interactive user:</p>
+
+          <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Daemon as 🤖 Microservice / Daemon / CLI
+    participant IdP as 🔑 Authorization Server
+    participant API as 🗄️ Protected Backend API
+
+    Note over Daemon,IdP: Direct Machine-to-Machine (No User Involved)
+    Daemon-&gt;&gt;IdP: 1. POST /token (grant_type=client_credentials, client_id, client_secret)
+    Note over IdP: Authenticate Client Secret &amp; Validate Scopes
+    IdP--&gt;&gt;Daemon: 2. 200 OK &#123; access_token: "eyJ...", token_type: "Bearer", expires_in: 3600 &#125;
+
+    Daemon-&gt;&gt;API: 3. GET /api/protected/reports (Authorization: Bearer eyJ...)
+    Note over API: Verify JWT Signature (JWKS) &amp; Check Scopes
+    API--&gt;&gt;Daemon: 4. 200 OK (Internal Reports JSON Payload)
+          </pre>
+
           <pre><code>POST /token HTTP/1.1
 Host: authorization-server.example.com
 Content-Type: application/x-www-form-urlencoded

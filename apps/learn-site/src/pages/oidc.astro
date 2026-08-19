@@ -147,6 +147,35 @@ Host: accounts.example.com
         <!-- EXECUTION FLOW -->
         <section id="execution-flow">
           <h2>5-Step OpenID Connect Flow</h2>
+          
+          <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant RP as 💻 Relying Party (App)
+    participant OP as 🌐 OpenID Provider (IdP)
+    participant UserInfo as 👤 UserInfo Endpoint
+
+    Note over RP,OP: Step 1: Dynamic Discovery (BYOI)
+    RP-&gt;&gt;OP: 1. GET /.well-known/openid-configuration
+    OP--&gt;&gt;RP: 2. Metadata (jwks_uri, auth_endpoint, token_endpoint)
+
+    Note over RP,OP: Step 2: User Authentication &amp; Code Flow
+    RP-&gt;&gt;OP: 3. GET /authorize (scope=openid profile email, nonce=n-0S6)
+    OP--&gt;&gt;RP: 4. 302 Redirect with Authorization Code
+
+    Note over RP,OP: Step 3: Token Exchange &amp; JWKS Key Fetch
+    RP-&gt;&gt;OP: 5. POST /token (code, grant_type=authorization_code)
+    OP--&gt;&gt;RP: 6. Tokens &#123; id_token (JWT), access_token &#125;
+    RP-&gt;&gt;OP: 7. GET /.well-known/jwks.json
+    OP--&gt;&gt;RP: 8. Public Verification Keys (kid, RSA Modulus, Exponent)
+
+    Note over RP: Step 4: Local ID Token Verification<br/>Verify RS256 signature, iss, aud, exp, nonce
+
+    Note over RP,UserInfo: Step 5: (Optional) Extended Profile Fetch
+    RP-&gt;&gt;UserInfo: 9. GET /userinfo (Authorization: Bearer &lt;access_token&gt;)
+    UserInfo--&gt;&gt;RP: 10. 200 OK &#123; sub, name, email, picture, roles &#125;
+          </pre>
+
           <ol>
             <li><strong>Discover Metadata:</strong> Fetch OpenID Provider configuration endpoints from <code>/.well-known/openid-configuration</code>.</li>
             <li><strong>Perform OAuth Flow:</strong> Initiate <code>/authorize</code> with <code>scope=openid profile email</code> and a cryptographic <code>nonce</code>.</li>

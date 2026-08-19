@@ -35,6 +35,33 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <!-- TOKEN CONSUMERS -->
         <section id="token-consumers">
           <h2>Token Types &amp; Intended Consumers</h2>
+
+          <pre class="mermaid">
+graph TD
+    subgraph AuthServer["🔑 Authorization Server (IdP)"]
+        TokenGen["Issue Token Pair"]
+    end
+
+    subgraph ClientApp["💻 Client Application (Relying Party)"]
+        IDT["👤 Consumes ID Token<br/>(Reads user profile, sub, email)"]
+        RT["🔄 Stores Refresh Token<br/>(HTTP-only cookie / Secure vault)"]
+        AT_Send["📤 Forwards Access Token"]
+    end
+
+    subgraph APIGateway["🛡️ API Gateway / Resource Server"]
+        JWKS["Verifies RS256 with JWKS"]
+        RS["🗄️ Consumes Access Token<br/>(Evaluates scopes, roles &amp; RBAC)"]
+    end
+
+    TokenGen --&gt;|"ID Token (Signed JWT)"| IDT
+    TokenGen --&gt;|"Refresh Token"| RT
+    TokenGen --&gt;|"Access Token (Bearer)"| AT_Send
+
+    AT_Send --&gt;|"Authorization: Bearer &lt;Access Token&gt;"| JWKS
+    JWKS --&gt; RS
+    RT -.-&gt;|"POST /token (grant_type=refresh_token)"| TokenGen
+          </pre>
+
           <table>
             <thead>
               <tr><th>Token Type</th><th>Intended Consumer</th><th>Security Purpose &amp; Rule</th></tr>
