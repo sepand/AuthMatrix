@@ -10,8 +10,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <div class="toc-label">On this page</div>
         <ul>
           <li><a href="#token-consumers">Token Types &amp; Intended Consumers</a></li>
+          <li><a href="#jwt-history">The Evolution of Tokens (Opaque to JWE)</a></li>
+          <li><a href="#bearer-risk">Bearer Token Masquerade Risk</a></li>
           <li><a href="#scopes-vs-claims">Scope vs Claim vs Response Type</a></li>
           <li><a href="#jwt-structure">JWT Anatomy &amp; Tamper-Proofing</a></li>
+          <li><a href="#access-token-payload">Access Token Payload Anatomy</a></li>
           <li><a href="#claims">Standard &amp; Custom JWT Claims</a></li>
           <li><a href="#signing">RS256 vs HS256 Cryptography</a></li>
           <li><a href="#jwks">Dynamic JWKS Key Verification</a></li>
@@ -27,7 +30,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
       <main class="content">
         <div class="page-header">
-          <span class="badge badge-advanced">Advanced &middot; 30 min</span>
+          <span class="badge badge-advanced">Advanced &middot; 35 min</span>
           <h1>Tokens, JWT, Claims &amp; Endpoints</h1>
           <p class="lead">Deep dive into token architectures, JSON Web Token (JWT) verification, cryptographic signature verification (RS256 / JWKS), standard claims, introspection, revocation, and WAM policies.</p>
         </div>
@@ -90,6 +93,34 @@ graph TD
           </table>
         </section>
 
+        <!-- JWT HISTORY -->
+        <section id="jwt-history">
+          <h2>The Evolution of Tokens: Opaque to JWE</h2>
+          <p>How token standards evolved across the internet:</p>
+          <ul>
+            <li><strong>Opaque Random Strings (Pre-2012):</strong> Tokens were completely opaque random strings (e.g. <code>SlAV32hkKG</code>). Every API call required the Resource Server to make a synchronous back-channel database lookup or introspection call to the Authorization Server to check validity and user identity.</li>
+            <li><strong>JSON Web Tokens (RFC 7519, 2015):</strong> Encoded self-contained identity and access claims into structured JSON. Allows APIs to validate expiration (<code>exp</code>) and scopes locally without database round-trips.</li>
+            <li><strong>JSON Web Signature (JWS - RFC 7515):</strong> Added cryptographic signatures (RS256, ES256) to ensure the token payload cannot be forged or tampered with.</li>
+            <li><strong>JSON Web Encryption (JWE - RFC 7516):</strong> Encrypts the payload for end-to-end confidentiality when passing sensitive PII across untrusted intermediaries.</li>
+          </ul>
+        </section>
+
+        <!-- BEARER RISK -->
+        <section id="bearer-risk">
+          <h2>Bearer Token Masquerade Risk &amp; Mitigation</h2>
+          <div class="callout danger">
+            <strong>⚠️ The Bearer Token Security Invariant:</strong>
+            <p>Access tokens are standard <em>Bearer</em> tokens: <strong>Whoever "bears" the token can access the authorized resource without secondary proof of identity.</strong> If an attacker steals your access token from browser storage or an insecure log file, they can immediately masquerade as you until the token expires.</p>
+            <p><strong>Required Mitigations:</strong></p>
+            <ul>
+              <li>Enforce short token lifetimes (15 to 60 minutes max).</li>
+              <li>Always transmit over TLS 1.3 / HTTPS.</li>
+              <li>Store tokens in <code>Secure</code>, <code>HttpOnly</code>, <code>SameSite=Strict</code> cookies rather than <code>localStorage</code>.</li>
+              <li>Implement Mutual TLS (mTLS - RFC 8705) or DPoP (Demonstrating Proof of Possession - RFC 9449) for high-security zero trust environments.</li>
+            </ul>
+          </div>
+        </section>
+
         <!-- SCOPES VS CLAIMS -->
         <section id="scopes-vs-claims">
           <h2>Scope vs Claim vs Response Type: The 3 Pillars</h2>
@@ -149,11 +180,39 @@ graph TD
 
 <span class="c">// 3. SIGNATURE (Asymmetric RSA SHA-256)</span>
 RS256(Base64URL(Header) + "." + Base64URL(Payload), PrivateKey)</code></pre>
+        </section>
 
-          <div class="callout tip">
-            <strong>🔒 Cryptographic Tamper-Proofing Demonstration:</strong>
-            <p>If an attacker modifies their role in the payload from <code>"roles": ["Developer"]</code> to <code>"roles": ["Admin"]</code>, the base64 payload changes. When the API verifies the signature using the IdP's public key, the mathematical hash check fails immediately, rejecting the forgery.</p>
-          </div>
+        <!-- ACCESS TOKEN PAYLOAD -->
+        <section id="access-token-payload">
+          <h2>Access Token Payload Anatomy (Okta &amp; Enterprise Standard)</h2>
+          <p>While OAuth 2.0 does not dictate access token formats, modern enterprise providers (Okta, Entra ID, Auth0) issue signed JWT access tokens packed with authorization metadata:</p>
+
+          <pre><code><span class="c">// Decoded Enterprise Access Token (JWT Payload)</span>
+&#123;
+  "ver": 1,
+  "jti": "AT.upPJqU-Ism6Fwt5Fpl8AhNAdoUeuMsEgJ_VxJ3WJ1hk",
+  "iss": "https://authmatrix.local/oauth2/default",
+  "aud": "https://api.authmatrix.local",
+  "sub": "alice@authmatrix.local",
+  "uid": "00u2yulup4eWbOttd1t7",
+  "iat": 1755000000,
+  "exp": 1755003600,
+  "cid": "0oa2yrbf35Vcbom491t7",
+  "scp": ["openid", "profile", "email", "read:reports", "write:users"],
+  "roles": ["Admin", "SecurityEngineer"]
+&#125;</code></pre>
+
+          <table>
+            <thead>
+              <tr><th>Claim Key</th><th>Purpose</th><th>Security Function</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>scp</code></td><td>Array of approved scope strings</td><td>Evaluated by API Gateway / backend route middleware for Least Privilege RBAC.</td></tr>
+              <tr><td><code>uid</code> / <code>sub</code></td><td>User Unique Identifier</td><td>Identifies user context for DB audits and row-level multi-tenancy.</td></tr>
+              <tr><td><code>cid</code> / <code>client_id</code></td><td>Application Identifier</td><td>Identifies calling application (Client) for throttling and rate limiting.</td></tr>
+              <tr><td><code>jti</code></td><td>JWT ID</td><td>Unique random token GUID; cached by APIs to detect and reject token replay.</td></tr>
+            </tbody>
+          </table>
         </section>
 
         <!-- CLAIMS -->
@@ -175,14 +234,6 @@ RS256(Base64URL(Header) + "." + Base64URL(Payload), PrivateKey)</code></pre>
               <tr><td><code>jti</code></td><td>JWT ID</td><td>Unique token GUID used to prevent replay attacks.</td></tr>
             </tbody>
           </table>
-
-          <h3>2. Custom Application Claims</h3>
-          <p>Modern applications embed structured authorization context directly into the JWT payload:</p>
-          <ul>
-            <li><code>roles: ["Admin", "SecurityLead"]</code> (RBAC group assignments)</li>
-            <li><code>permissions: ["read:reports", "delete:users"]</code> (Fine-grained Least Privilege)</li>
-            <li><code>tenant_id: "org_acme_corp_88"</code> (Multi-tenant data isolation)</li>
-          </ul>
         </section>
 
         <!-- SIGNING -->
