@@ -110,14 +110,76 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...</code></pre>
 
         <!-- SCOPES -->
         <section id="scopes">
-          <h2>OAuth Scopes &amp; Consent</h2>
-          <p>Scopes are space-separated strings defining the boundaries of requested access. During authorization, the user is presented with a consent screen enumerating these permissions.</p>
-          <div class="callout note">
-            <strong>Common Examples:</strong>
-            <ul>
-              <li><code>read:users write:users</code> (Custom API permissions)</li>
-              <li><code>openid profile email</code> (OIDC standard scopes)</li>
+          <h2>OAuth Scopes &amp; User Consent</h2>
+          <p>In <strong>RFC 6749 Section 3.3</strong>, <strong>Scopes</strong> are space-delimited strings defining the exact permissions an application requests. <strong>Consent</strong> is the user-facing approval step where the Resource Owner explicitly grants or denies those permissions.</p>
+
+          <h3>1. How Scopes Translate into Consent Screens</h3>
+          <p>When an application requests authorization with query parameters:</p>
+          <pre><code>GET /authorize?
+  response_type=code
+  &amp;client_id=my_calendar_app
+  &amp;redirect_uri=https%3A%2F%2Fapp.example.com%2Fcb
+  &amp;scope=openid%20profile%20read:calendar%20write:calendar
+  &amp;state=af0ifjsldkj HTTP/1.1
+Host: accounts.example.com</code></pre>
+
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.5rem; margin:1.5rem 0;">
+            <div style="font-weight:700; color:var(--primary); margin-bottom:0.75rem; font-size:1.1rem;">🔑 Consent Dialog (What the User Sees)</div>
+            <p style="margin-bottom:0.5rem; font-size:0.95rem;"><strong>"My Calendar App"</strong> wants permission to access your account:</p>
+            <ul style="margin-bottom:1rem; line-height:1.7;">
+              <li>&#9989; <strong>View your basic profile:</strong> <code>openid profile</code></li>
+              <li>&#9989; <strong>Read calendar events:</strong> <code>read:calendar</code></li>
+              <li>&#9989; <strong>Create and modify calendar events:</strong> <code>write:calendar</code></li>
             </ul>
+            <div style="display:flex; gap:0.75rem;">
+              <button style="background:var(--primary); color:#000; border:none; padding:0.4rem 1rem; border-radius:4px; font-weight:600; cursor:pointer;" disabled>Allow Access</button>
+              <button style="background:rgba(255,255,255,0.1); color:var(--text); border:1px solid var(--border); padding:0.4rem 1rem; border-radius:4px; cursor:pointer;" disabled>Cancel</button>
+            </div>
+          </div>
+
+          <h3>2. Scope Categories &amp; Examples</h3>
+
+          <h4>A. Standard OpenID Connect (OIDC) Scopes</h4>
+          <table>
+            <thead>
+              <tr><th>Scope String</th><th>Claims Released</th><th>User Consent Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>openid</code></td><td><code>sub</code> (User identifier)</td><td>"Verify your identity"</td></tr>
+              <tr><td><code>profile</code></td><td><code>name</code>, <code>picture</code>, <code>locale</code></td><td>"View your basic profile information"</td></tr>
+              <tr><td><code>email</code></td><td><code>email</code>, <code>email_verified</code></td><td>"View your email address"</td></tr>
+              <tr><td><code>phone</code></td><td><code>phone_number</code></td><td>"View your phone number"</td></tr>
+              <tr><td><code>address</code></td><td>Formatted physical address</td><td>"View your physical address"</td></tr>
+              <tr><td><code>offline_access</code></td><td>Issues a Refresh Token</td><td>"Maintain access when you are not using the app"</td></tr>
+            </tbody>
+          </table>
+
+          <h4>B. Custom Microservice &amp; REST API Scopes (Action:Resource)</h4>
+          <table>
+            <thead>
+              <tr><th>Scope String</th><th>Protected Endpoint</th><th>Permission Granted</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>read:reports</code></td><td><code>GET /api/protected/reports</code></td><td>View internal analytical reports</td></tr>
+              <tr><td><code>write:reports</code></td><td><code>POST /api/protected/reports</code></td><td>Create and publish reports</td></tr>
+              <tr><td><code>read:users</code></td><td><code>GET /api/protected/users</code></td><td>List directory members</td></tr>
+              <tr><td><code>write:users</code></td><td><code>POST /api/protected/users</code></td><td>Invite and provision user accounts</td></tr>
+              <tr><td><code>delete:users</code></td><td><code>DELETE /api/protected/users/:id</code></td><td>Deprovision user accounts</td></tr>
+              <tr><td><code>execute:jobs</code></td><td><code>POST /api/protected/jobs</code></td><td>Run background asynchronous workloads</td></tr>
+            </tbody>
+          </table>
+
+          <h4>C. Real-World Cloud &amp; SaaS Scopes</h4>
+          <ul>
+            <li><strong>Google:</strong> <code>https://www.googleapis.com/auth/drive.file</code> (Manage Drive files created by app)</li>
+            <li><strong>Microsoft Graph:</strong> <code>User.Read</code>, <code>Mail.Send</code>, <code>Files.ReadWrite.All</code></li>
+            <li><strong>GitHub:</strong> <code>repo</code> (Full private repo control), <code>user:email</code> (Read email addresses)</li>
+          </ul>
+
+          <h3>3. Incremental (Step-Up) Consent Pattern</h3>
+          <div class="callout tip">
+            <strong>🛡️ Principle of Least Privilege:</strong>
+            <p>Rather than demanding intrusive scopes upon initial registration, modern apps request only <code>openid profile email</code> on login, and request higher scopes (e.g. <code>write:reports</code>) <em>incrementally</em> only when the user triggers that specific feature.</p>
           </div>
         </section>
 
