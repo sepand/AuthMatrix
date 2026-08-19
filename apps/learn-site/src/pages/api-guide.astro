@@ -1,0 +1,181 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<Layout
+  title="API Architecture & Security Guide"
+  description="Comprehensive technical guide to the AuthMatrix Express API backend, Zero Trust security model, endpoint inventory, and Azure APIM Gateway policies."
+  section="API Guide"
+>
+  <div class="page-wrap">
+    <div class="learn-layout">
+      <aside class="toc">
+        <span class="toc-label">In this guide</span>
+        <ul>
+          <li><a href="#overview">1. Monorepo Architecture</a></li>
+          <li><a href="#endpoints">2. API Endpoint Inventory</a></li>
+          <li><a href="#middleware">3. Middleware &amp; Code Implementation</a></li>
+          <li><a href="#routes">4. Route Handlers with Code Examples</a></li>
+          <li><a href="#zero-trust">5. Zero Trust Security Architecture</a></li>
+          <li><a href="#apim">6. Azure APIM Gateway Policy</a></li>
+        </ul>
+        <hr class="toc-divider" />
+        <nav class="toc-nav">
+          <a href={base + '/'}>Home</a>
+          <a href={base + '/tokens'}>&larr; Tokens &amp; JWT</a>
+          <a href={base + '/labs'}>Labs &rarr;</a>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <div class="page-header">
+          <span class="badge badge-advanced">Architecture &middot; 30 min</span>
+          <h1>API Architecture &amp; Security Guide</h1>
+          <p class="lead">A complete technical breakdown of the AuthMatrix Express API backend, Express 5 TypeScript handlers, Zero Trust RBAC middleware, and Azure APIM gateway integration.</p>
+        </div>
+
+        <!-- 1. OVERVIEW -->
+        <section id="overview">
+          <h2>1. Monorepo Architecture</h2>
+          <p>The AuthMatrix repository decouples presentation, authentication, and REST API microservices into distinct monorepo packages under <code>apps/</code>:</p>
+          <ul>
+            <li><strong><code>apps/learn-site</code>:</strong> Static Astro documentation deployed to GitHub Pages (<code>/AuthMatrix</code>).</li>
+            <li><strong><code>apps/astro-frontend</code>:</strong> SSR application running on <code>http://localhost:3000</code> for local OIDC lab authentication (Okta &amp; Entra ID).</li>
+            <li><strong><code>apps/api-server</code>:</strong> Express 5 TypeScript REST API backend running on <code>http://localhost:4000</code> enforcing fine-grained RBAC.</li>
+            <li><strong><code>config/azure-apim-policy.xml</code>:</strong> Inbound XML policy for Azure API Management enforcing JWT validation and claim normalization.</li>
+          </ul>
+        </section>
+
+        <!-- 2. ENDPOINTS -->
+        <section id="endpoints">
+          <h2>2. API Endpoint Inventory</h2>
+          <p>The API server exposes 10 endpoints categorized by Zero Trust privilege requirements:</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Permission</th>
+                <th>Allowed Roles</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>GET</code></td><td><code>/api/public</code></td><td>None</td><td>Anonymous</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/public/health</code></td><td>None</td><td>Anonymous</td></tr>
+              <tr><td><code>POST</code></td><td><code>/api/auth/mock-token</code></td><td>None</td><td>Anonymous</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/protected/me</code></td><td>Authenticated</td><td>All Roles</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/protected/users</code></td><td><code>read:users</code></td><td>Admin, Manager, Developer</td></tr>
+              <tr><td><code>POST</code></td><td><code>/api/protected/users</code></td><td><code>write:users</code></td><td>Admin</td></tr>
+              <tr><td><code>DELETE</code></td><td><code>/api/protected/users/:id</code></td><td><code>delete:users</code></td><td>Admin</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/protected/reports</code></td><td><code>read:reports</code></td><td>Admin, Manager, Developer, Auditor</td></tr>
+              <tr><td><code>POST</code></td><td><code>/api/protected/reports</code></td><td><code>write:reports</code></td><td>Admin, Manager</td></tr>
+              <tr><td><code>PUT</code></td><td><code>/api/protected/settings</code></td><td><code>write:settings</code></td><td>Admin</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/protected/audit</code></td><td><code>read:audit</code></td><td>Admin, Auditor</td></tr>
+              <tr><td><code>DELETE</code></td><td><code>/api/protected/audit</code></td><td><code>delete:audit</code></td><td>Admin</td></tr>
+              <tr><td><code>POST</code></td><td><code>/api/protected/jobs</code></td><td><code>execute:jobs</code></td><td>Admin, Developer</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- 3. MIDDLEWARE -->
+        <section id="middleware">
+          <h2>3. Middleware &amp; Code Implementation</h2>
+          <p>Every incoming request passes through an authentication middleware (<code>requireAuth</code>) followed by fine-grained permission middleware (<code>requirePermission</code>):</p>
+          <pre><code><span class="c">// Authentication Middleware — inspects Gateway Headers or Bearer JWT</span>
+export const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction) => &#123;
+  const gatewayUser = req.headers['x-user-id'] as string;
+  const gatewayRoles = req.headers['x-user-roles'] as string;
+  const gatewayPermissions = req.headers['x-user-permissions'] as string;
+
+  if (gatewayUser) &#123;
+    req.user = &#123;
+      id: gatewayUser,
+      email: `$&#123;gatewayUser&#125;@authmatrix.local`,
+      roles: gatewayRoles ? gatewayRoles.split(',') : [],
+      permissions: gatewayPermissions ? gatewayPermissions.split(',') : [],
+    &#125;;
+    return next();
+  &#125;
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) &#123;
+    return res.status(401).json(&#123; error: 'Unauthorized', message: 'Missing Bearer token' &#125;);
+  &#125;
+
+  try &#123;
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    req.user = &#123;
+      id: decoded.sub,
+      email: decoded.email,
+      roles: decoded.roles || [],
+      permissions: decoded.permissions || [],
+    &#125;;
+    next();
+  &#125; catch (err) &#123;
+    return res.status(401).json(&#123; error: 'Unauthorized', message: 'Invalid token signature' &#125;);
+  &#125;
+&#125;;</code></pre>
+        </section>
+
+        <!-- 4. ROUTES -->
+        <section id="routes">
+          <h2>4. Route Handlers with Code Examples</h2>
+          <p>Example handler for privileged user deprovisioning (<code>DELETE /api/protected/users/:id</code>):</p>
+          <pre><code>app.delete('/api/protected/users/:id', requireAuth, requirePermission('delete:users'), (req: AuthenticatedRequest, res: Response) => &#123;
+  const id = parseInt(String(req.params.id), 10);
+  const idx = USERS_DB.findIndex(u => u.id === id);
+
+  if (idx === -1) &#123;
+    return res.status(404).json(&#123; error: 'Not Found', message: `User $&#123;id&#125; not found` &#125;);
+  &#125;
+
+  const removed = USERS_DB.splice(idx, 1)[0];
+  res.json(&#123;
+    status: 'success',
+    message: `User '$&#123;removed.name&#125;' deprovisioned successfully.`,
+    operator: req.user?.id,
+  &#125;);
+&#125;);</code></pre>
+        </section>
+
+        <!-- 5. ZERO TRUST -->
+        <section id="zero-trust">
+          <h2>5. Zero Trust Security Architecture</h2>
+          <div class="callout tip">
+            <strong>🛡️ Zero Trust Controls:</strong>
+            <ul>
+              <li><strong>Verify Explicitly:</strong> Every API call validates signature and expiration, never network origin.</li>
+              <li><strong>Least Privilege:</strong> Code checks <code>permissions.includes('delete:users')</code> rather than broad <code>user.role === 'Admin'</code> checks.</li>
+              <li><strong>Assume Breach:</strong> Untrusted client headers (<code>x-user-id</code>, <code>x-user-roles</code>) are stripped at the edge before proxying to internal services.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 6. APIM -->
+        <section id="apim">
+          <h2>6. Azure APIM Gateway Policy</h2>
+          <p>Inbound XML policy snippet for dual-IdP JWT validation and header injection:</p>
+          <pre><code>&lt;policies&gt;
+    &lt;inbound&gt;
+        &lt;base /&gt;
+        &lt;set-header name="x-user-id" exists-action="delete" /&gt;
+        &lt;set-header name="x-user-roles" exists-action="delete" /&gt;
+
+        &lt;validate-jwt token-value="@(context.Request.Headers.GetValueOrDefault("Authorization","").Replace("Bearer ",""))"
+                      failed-validation-httpcode="401"&gt;
+            &lt;openid-config url="https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration" /&gt;
+        &lt;/validate-jwt&gt;
+
+        &lt;set-header name="x-user-id" exists-action="override"&gt;
+            &lt;value&gt;@(context.Request.Jwt.Claims.GetValueOrDefault("sub", "anonymous"))&lt;/value&gt;
+        &lt;/set-header&gt;
+    &lt;/inbound&gt;
+&lt;/policies&gt;</code></pre>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</Layout>

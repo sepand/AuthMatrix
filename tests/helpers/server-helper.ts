@@ -24,6 +24,16 @@ export async function ensureServer(): Promise<string> {
 
   try {
     const serverModule = await import('../../apps/api-server/src/index.ts');
+    if (serverModule.app && !serverInstance) {
+      serverInstance = serverModule.app.listen(parseInt(API_PORT, 10));
+      serverInstance.on('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          serverInstance = null;
+        }
+      });
+      serverStarted = true;
+      return BASE_URL;
+    }
     if (serverModule.server) {
       serverInstance = serverModule.server;
     }

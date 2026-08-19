@@ -3,199 +3,237 @@ import Layout from '../layouts/Layout.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<Layout section="Grant Types">
+<Layout section="Grant Types" title="OAuth 2.0 Grant Types &amp; Flows">
   <div class="page-wrap">
     <div class="learn-layout">
       <nav class="toc">
         <div class="toc-label">On this page</div>
         <ul>
-          <li><a href="#decision">Grant Type Decision Table</a></li>
-          <li><a href="#auth-code">Authorization Code Flow</a></li>
-          <li><a href="#pkce">PKCE Extension</a></li>
-          <li><a href="#client-creds">Client Credentials Flow</a></li>
-          <li><a href="#implicit">Implicit Flow (Deprecated)</a></li>
-          <li><a href="#device">Device Authorization Flow</a></li>
-          <li><a href="#refresh">Refresh Tokens</a></li>
+          <li><a href="#decision">Grant Type Decision Guide</a></li>
+          <li><a href="#auth-code">Authorization Code Flow (3-Legged)</a></li>
+          <li><a href="#params-breakdown">Detailed Parameter Breakdown</a></li>
+          <li><a href="#pkce">PKCE Extension (RFC 7636)</a></li>
+          <li><a href="#client-creds">Client Credentials Flow (M2M)</a></li>
+          <li><a href="#saml-assertion">SAML 2.0 Assertion Flow (RFC 7522)</a></li>
+          <li><a href="#device">Device Authorization Flow (RFC 8628)</a></li>
+          <li><a href="#interaction-code">Interaction Code Flow</a></li>
+          <li><a href="#deprecated">Deprecated Flows (OAuth 2.1)</a></li>
+          <li><a href="#refresh">Refresh Tokens &amp; Rotation</a></li>
         </ul>
+        <hr class="toc-divider" />
+        <nav class="toc-nav">
+          <a href={base + '/oauth'}>&larr; OAuth 2.0</a>
+          <a href={base + '/oidc'}>OIDC &rarr;</a>
+        </nav>
       </nav>
 
       <main class="content">
-        <header class="page-header">
-          <h1>OAuth 2.0 Grant Types</h1>
-          <span class="badge badge-intermediate">Intermediate</span>
-        </header>
+        <div class="page-header">
+          <span class="badge badge-intermediate">Intermediate &middot; 25 min</span>
+          <h1>OAuth 2.0 Grant Types &amp; Flows</h1>
+          <p class="lead">Deep dive into Authorization Code Flow with PKCE, M2M Client Credentials, SAML 2.0 Bearer assertions, Device Flow, and parameter breakdowns.</p>
+        </div>
 
+        <!-- DECISION GUIDE -->
         <section id="decision">
-          <h2>Grant Type Decision Table</h2>
-          <table style="width:100%; border-collapse:collapse; margin-bottom:1rem;">
+          <h2>Grant Type Decision Guide</h2>
+          <table>
             <thead>
-              <tr style="border-bottom:2px solid #ccc; text-align:left;">
+              <tr>
                 <th>App Type</th>
                 <th>Client Type</th>
-                <th>Grant Type</th>
-                <th>Reason</th>
+                <th>Recommended Flow</th>
+                <th>Client Secret?</th>
               </tr>
             </thead>
             <tbody>
-              <tr style="border-bottom:1px solid #eee;">
-                <td>Server-side web app</td>
+              <tr>
+                <td><strong>Server-side Web App</strong> (Node, Python, Java)</td>
                 <td>Confidential</td>
                 <td>Authorization Code</td>
-                <td>Back-channel exchange</td>
+                <td>Yes</td>
               </tr>
-              <tr style="border-bottom:1px solid #eee;">
-                <td>SPA (React/Vue)</td>
+              <tr>
+                <td><strong>Single Page App</strong> (React, Vue, Angular)</td>
                 <td>Public</td>
                 <td>Auth Code + PKCE</td>
-                <td>No client secret</td>
+                <td>No</td>
               </tr>
-              <tr style="border-bottom:1px solid #eee;">
-                <td>Mobile / Native</td>
+              <tr>
+                <td><strong>Mobile / Native App</strong> (iOS, Android)</td>
                 <td>Public</td>
                 <td>Auth Code + PKCE</td>
-                <td>Binary can be decompiled</td>
+                <td>No</td>
               </tr>
-              <tr style="border-bottom:1px solid #eee;">
-                <td>Microservice/Daemon</td>
+              <tr>
+                <td><strong>Microservice / Daemon / CLI</strong></td>
                 <td>Confidential</td>
                 <td>Client Credentials</td>
-                <td>No user involved</td>
+                <td>Yes</td>
               </tr>
-              <tr style="border-bottom:1px solid #eee;">
-                <td>IoT / Smart TV</td>
+              <tr>
+                <td><strong>IoT / Smart TV / CLI Device</strong></td>
                 <td>Public</td>
                 <td>Device Authorization</td>
-                <td>No keyboard</td>
-              </tr>
-              <tr>
-                <td>(Deprecated)</td>
-                <td>-</td>
-                <td>Resource Owner Password</td>
-                <td>Avoid</td>
+                <td>No</td>
               </tr>
             </tbody>
           </table>
         </section>
 
+        <!-- AUTH CODE -->
         <section id="auth-code">
-          <h2>Authorization Code Flow</h2>
-          <p>Defined in RFC 6749 Section 4.1. This is the most common and secure flow for apps that involve a user.</p>
+          <h2>Authorization Code Flow (Golden Standard - 3-Legged)</h2>
+          <p>The 3-legged authorization code grant is the recommended standard for user authentication:</p>
           
-          <div style="margin-top:1rem;">
-            <div style="border-left:4px solid #f1c40f; padding-left:1rem; margin-bottom:1rem;">
-              <strong>Step 1: Authorization Request (Front Channel)</strong><br>
-              <pre><code>GET /authorize?response_type=code
-&amp;client_id=s6BhdRkqt3
-&amp;state=xyz
-&amp;redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb</code></pre>
-            </div>
-            
-            <div style="border-left:4px solid #f1c40f; padding-left:1rem; margin-bottom:1rem;">
-              <strong>Step 2: Authorization Response (Front Channel)</strong><br>
-              <pre><code>HTTP/1.1 302 Found
-Location: https://client.example.com/cb?code=SplxlOBeZQQYbYS6WxSbIA
-&amp;state=xyz</code></pre>
-            </div>
+          <pre><code><span class="c">// STEP 1: Front Channel Authorization Request</span>
+GET /authorize?
+  response_type=code
+  &amp;client_id=s6BhdRkqt3
+  &amp;redirect_uri=https%3A%2F%2Fclient.example.com%2Fcb
+  &amp;scope=openid%20profile%20email
+  &amp;state=af0ifjsldkj HTTP/1.1
+Host: authorization-server.example.com
 
-            <div style="border-left:4px solid #2ecc71; padding-left:1rem; margin-bottom:1rem;">
-              <strong>Step 3: Token Request (Back Channel)</strong><br>
-              <pre><code>POST /token HTTP/1.1
+<span class="c">// STEP 2: Front Channel Redirect Response (302 Found)</span>
+HTTP/1.1 302 Found
+Location: https://client.example.com/cb?
+  code=SplxlOBeZQQYbYS6WxSbIA
+  &amp;state=af0ifjsldkj
+
+<span class="c">// STEP 3: Back Channel Token Request</span>
+POST /token HTTP/1.1
+Host: authorization-server.example.com
 Content-Type: application/x-www-form-urlencoded
 Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
 
-grant_type=authorization_code&amp;code=SplxlOBeZQQYbYS6WxSbIA
-&amp;redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb</code></pre>
-            </div>
+grant_type=authorization_code
+&amp;code=SplxlOBeZQQYbYS6WxSbIA
+&amp;redirect_uri=https%3A%2F%2Fclient.example.com%2Fcb
+&amp;client_id=s6BhdRkqt3
+&amp;client_secret=gX1fBat3bV
 
-            <div style="border-left:4px solid #2ecc71; padding-left:1rem; margin-bottom:1rem;">
-              <strong>Step 4: Token Response (Back Channel)</strong><br>
-              <pre><code>HTTP/1.1 200 OK
-Content-Type: application/json
-
+<span class="c">// STEP 4: Token Response JSON</span>
 &#123;
-  "access_token":"2YotnFZFEjr1zCsicMWpAA",
-  "token_type":"bearer",
-  "expires_in":3600,
-  "refresh_token":"tGzv3JOkF0XG5Qx2TlKWIA"
+  "access_token": "SlAV32hkKG",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "8xLOxBtZp8",
+  "scope": "openid profile email"
 &#125;</code></pre>
-            </div>
-          </div>
         </section>
 
+        <!-- PARAMS BREAKDOWN -->
+        <section id="params-breakdown">
+          <h2>Detailed Parameter Breakdown</h2>
+          
+          <h3>1. GET /authorize Request Parameters</h3>
+          <ul>
+            <li><code>response_type=code</code>: Informs the Authorization Server that the application is requesting an authorization code grant.</li>
+            <li><code>client_id</code>: Public identifier for the registered application.</li>
+            <li><code>redirect_uri</code>: Whitelisted destination where the user browser will be redirected after approval.</li>
+            <li><code>scope</code>: Space-separated list of requested permissions.</li>
+            <li><code>state</code>: Cryptographically random string validated on return to prevent CSRF attacks.</li>
+          </ul>
+
+          <h3>2. POST /token Request Parameters</h3>
+          <ul>
+            <li><code>grant_type=authorization_code</code>: Declares the token redemption grant type.</li>
+            <li><code>code</code>: The single-use authorization code delivered in the redirect.</li>
+            <li><code>redirect_uri</code>: Must match the exact redirect URI sent in the initial request.</li>
+            <li><code>client_id</code> / <code>client_secret</code>: Confidential client credentials verifying the token requester's identity.</li>
+          </ul>
+        </section>
+
+        <!-- PKCE -->
         <section id="pkce">
           <h2>PKCE Extension (RFC 7636)</h2>
-          <p>Proof Key for Code Exchange (PKCE) protects the Authorization Code flow from interception attacks.</p>
+          <p>Proof Key for Code Exchange prevents authorization code interception attacks on public clients:</p>
           <ol>
-            <li>Generate a random string called <code>code_verifier</code>.</li>
-            <li>Compute the <code>code_challenge</code>: <code>BASE64URL(SHA256(code_verifier))</code>.</li>
-            <li>Send the <code>code_challenge</code> and <code>code_challenge_method=S256</code> in the <code>/authorize</code> request.</li>
-            <li>Send the original <code>code_verifier</code> in the <code>/token</code> request. The server verifies the hash matches.</li>
+            <li>Client creates a random <code>code_verifier</code> (43–128 URL-safe characters).</li>
+            <li>Client calculates: <code>code_challenge = Base64URL(SHA256(code_verifier))</code>.</li>
+            <li>Client sends <code>code_challenge</code> and <code>code_challenge_method=S256</code> in the front-channel <code>/authorize</code> request.</li>
+            <li>Client presents original <code>code_verifier</code> in the back-channel <code>/token</code> POST request.</li>
+            <li>Authorization Server validates: <code>SHA256(code_verifier) === code_challenge</code>.</li>
           </ol>
         </section>
 
+        <!-- CLIENT CREDS -->
         <section id="client-creds">
-          <h2>Client Credentials Flow</h2>
-          <p>RFC 6749 Section 4.4. Used for machine-to-machine communication where there is no user context.</p>
+          <h2>Client Credentials Flow (RFC 6749 Section 4.4)</h2>
+          <p>Used for machine-to-machine (M2M) communication without an interactive user:</p>
           <pre><code>POST /token HTTP/1.1
+Host: authorization-server.example.com
 Content-Type: application/x-www-form-urlencoded
-Authorization: Basic czZCaGRSa3F0MzpnWDFmQmF0M2JW
 
-grant_type=client_credentials</code></pre>
+grant_type=client_credentials
+&amp;client_id=daemon_service_app
+&amp;client_secret=secure_daemon_secret
+&amp;scope=read:reports%20execute:jobs</code></pre>
         </section>
 
-        <section id="implicit">
-          <h2>Implicit Flow (Deprecated)</h2>
-          <div class="callout warning">
-            <strong>Warning:</strong> Deprecated in OAuth 2.1. Do not use.
-          </div>
-          <p>The implicit flow (<code>response_type=token</code>) returned tokens directly in the URL fragment. It suffered from token leakage in browser history, lack of CSRF protection, and could not issue refresh tokens.</p>
+        <!-- SAML ASSERTION -->
+        <section id="saml-assertion">
+          <h2>SAML 2.0 Bearer Assertion Flow (RFC 7522)</h2>
+          <p>Enables an enterprise client to exchange an existing signed SAML 2.0 XML assertion for an OAuth 2.0 access token:</p>
+          <pre><code>POST /token HTTP/1.1
+Host: authorization-server.example.com
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Asaml2-bearer
+&amp;assertion=PHNhbWxwOlJlc3BvbnNlIHhtbG5zOnNhbWxwPSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6cHJvdG9jb2wi...</code></pre>
         </section>
 
+        <!-- DEVICE FLOW -->
         <section id="device">
-          <h2>Device Authorization Flow</h2>
-          <p>RFC 8628. For devices without a browser or keyboard (e.g., Smart TVs).</p>
-          <ol>
-            <li>Device requests a code from the Authorization Server.</li>
-            <li>Server returns a <code>user_code</code> and a <code>verification_uri</code>.</li>
-            <li>Device displays the URI and code to the user. User completes login on their phone.</li>
-            <li>Device polls the token endpoint until the user finishes.</li>
-          </ol>
+          <h2>Device Authorization Flow (RFC 8628)</h2>
+          <p>Designed for input-constrained devices (smart TVs, CLI tools):</p>
+          <pre><code><span class="c">// 1. Device requests verification code</span>
+POST /device/code HTTP/1.1
+client_id=smart_tv_app
+
+<span class="c">// Response</span>
+&#123;
+  "device_code": "GmRhmhcxhwAzkoEqiMEg...",
+  "user_code": "WDJB-MJHT",
+  "verification_uri": "https://example.com/activate",
+  "interval": 5
+&#125;</code></pre>
         </section>
 
+        <!-- INTERACTION CODE -->
+        <section id="interaction-code">
+          <h2>Interaction Code Flow</h2>
+          <p>An extension (supported by Okta Identity Engine) enabling client applications to natively drive authentication, passwordless challenges, and MFA interactions step-by-step without requiring full browser redirects.</p>
+        </section>
+
+        <!-- DEPRECATED -->
+        <section id="deprecated">
+          <h2>Deprecated Flows in OAuth 2.1</h2>
+          <div class="callout danger">
+            <strong>⛔ Deprecated in Modern Architecture:</strong>
+            <ul>
+              <li><strong>Implicit Flow (<code>response_type=token</code>):</strong> Returns tokens directly in the URL fragment. High risk of token exposure in history, referer headers, and browser extensions. Replaced by Auth Code + PKCE.</li>
+              <li><strong>Resource Owner Password Flow (<code>grant_type=password</code>):</strong> Re-introduces the password anti-pattern by asking applications to collect master user credentials directly. Avoid in all modern architectures.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- REFRESH -->
         <section id="refresh">
-          <h2>Refresh Tokens</h2>
-          <p>RFC 6749 Section 6. Refresh tokens are used to obtain new access tokens without requiring the user to log in again.</p>
-          <table style="width:100%; border-collapse:collapse; margin-top:1rem;">
-            <thead>
-              <tr style="border-bottom:2px solid #ccc; text-align:left;">
-                <th>Feature</th>
-                <th>Access Token</th>
-                <th>Refresh Token</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style="border-bottom:1px solid #eee;">
-                <td>Sent to APIs</td>
-                <td>Yes</td>
-                <td>No (Never)</td>
-              </tr>
-              <tr style="border-bottom:1px solid #eee;">
-                <td>Sent to /token</td>
-                <td>No</td>
-                <td>Yes</td>
-              </tr>
-              <tr>
-                <td>Lifetime</td>
-                <td>Short (e.g., 15 mins)</td>
-                <td>Long (e.g., 30 days)</td>
-              </tr>
-            </tbody>
-          </table>
+          <h2>Refresh Tokens &amp; Rotation (RFC 6749 Section 6)</h2>
+          <pre><code>POST /token HTTP/1.1
+Host: authorization-server.example.com
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token
+&amp;refresh_token=tGzv3JOkF0XG5Qx2TlKWIA</code></pre>
+          <p><strong>Refresh Token Rotation:</strong> Every time a refresh token is used, the Authorization Server invalidates it and issues a fresh refresh token pair. If a revoked token is presented, the server revokes the entire session lineage.</p>
         </section>
 
         <footer class="page-footer">
           <div class="prev-next">
-            <a href={base + '/oauth'}>&larr; Prev: OAuth 2.0</a>
+            <a href={base + '/oauth'}>&larr; OAuth 2.0</a>
             <a href={base + '/oidc'}>Next: OIDC &rarr;</a>
           </div>
         </footer>

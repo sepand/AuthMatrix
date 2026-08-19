@@ -3,7 +3,7 @@ import Layout from '../layouts/Layout.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<Layout section="OAuth 2.0">
+<Layout section="OAuth 2.0" title="OAuth 2.0 Fundamentals">
   <div class="page-wrap">
     <div class="learn-layout">
       <nav class="toc">
@@ -12,106 +12,168 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           <li><a href="#problem">The Problem OAuth Solves</a></li>
           <li><a href="#what-is">What is OAuth 2.0?</a></li>
           <li><a href="#actors">The Four Actors</a></li>
+          <li><a href="#api-keys-vs-oauth">API Keys vs OAuth Tokens</a></li>
           <li><a href="#scopes">Scopes &amp; Consent</a></li>
           <li><a href="#clients">Public vs Confidential Clients</a></li>
           <li><a href="#channels">Front Channel vs Back Channel</a></li>
+          <li><a href="#framework-variance">Framework vs Protocol Variance</a></li>
           <li><a href="#endpoints">OAuth Endpoints</a></li>
-          <li><a href="#security">Security Checklist</a></li>
+          <li><a href="#security">Web Security 101 Checklist</a></li>
         </ul>
+        <hr class="toc-divider" />
+        <nav class="toc-nav">
+          <a href={base + '/'}>Home</a>
+          <a href={base + '/flows'}>Grant Types &rarr;</a>
+        </nav>
       </nav>
 
       <main class="content">
-        <header class="page-header">
+        <div class="page-header">
+          <span class="badge badge-beginner">Beginner &middot; 20 min</span>
           <h1>OAuth 2.0 Fundamentals</h1>
-          <span class="badge badge-beginner">Beginner</span>
-        </header>
+          <p class="lead">Understanding delegated authorization, the password anti-pattern, actor topologies, token consumers, and modern security best practices under RFC 6749 and RFC 9700.</p>
+        </div>
 
+        <!-- PROBLEM -->
         <section id="problem">
           <h2>The Problem OAuth Solves</h2>
-          <p>Before OAuth, if an application needed access to a user's data on another service, the application typically asked the user for their username and password. This is known as the "password anti-pattern".</p>
+          <p>Before OAuth, if a third-party application needed access to a user's data on another service (e.g., printing contacts or managing calendars), it asked the user for their raw username and password. This is known as the <strong>password anti-pattern</strong>.</p>
           <div class="callout danger">
-            <strong>Danger:</strong> Sharing passwords means the application has full control over the user's account, can impersonate them indefinitely, and the user cannot revoke access without changing their password.
+            <strong>⚠️ Hazards of the Password Anti-Pattern:</strong>
+            <ul>
+              <li><strong>Over-Privileged Access:</strong> The third-party application receives full access to the user's entire account.</li>
+              <li><strong>Irrevocability:</strong> The user cannot revoke access from a single app without changing their master password.</li>
+              <li><strong>Credential Compromise:</strong> If the third-party application is breached, the user's primary password is leaked.</li>
+            </ul>
           </div>
-          <p>OAuth was created to solve this exact problem by allowing applications to obtain limited access without ever seeing the user's credentials.</p>
         </section>
 
+        <!-- WHAT IS -->
         <section id="what-is">
           <h2>What is OAuth 2.0?</h2>
-          <p>According to RFC 6749:</p>
+          <p>According to <strong>RFC 6749</strong>:</p>
           <blockquote>
-            "The OAuth 2.0 authorization framework enables a third-party application to obtain limited access to an HTTP service."
+            "The OAuth 2.0 authorization framework enables a third-party application to obtain limited access to an HTTP service, either on behalf of a resource owner by orchestrating an approval interaction between the resource owner and the HTTP service, or by allowing the third-party application to obtain access on its own behalf."
           </blockquote>
-          <p>A common analogy is the <strong>valet key</strong> for a car. A valet key allows the parking attendant to drive the car and park it, but it does not open the trunk or glove box. Similarly, OAuth provides a token that grants limited access to specific resources for a limited time.</p>
+          <p>A classic analogy is the <strong>valet key</strong> for an automobile. A valet key grants the parking attendant permission to start the engine and drive the vehicle, but does not open the trunk or glovebox, and is returned after use.</p>
         </section>
 
+        <!-- ACTORS -->
         <section id="actors">
-          <h2>The Four Actors</h2>
-          <p>RFC 6749 Section 1.1 defines four roles in the OAuth ecosystem:</p>
-          <div style="display:flex; flex-direction:column; gap:1rem; margin:1rem 0;">
-            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
-              <strong>Resource Owner</strong>: The user who authorizes an application to access their account.
+          <h2>The Four OAuth Actors (RFC 6749 Section 1.1)</h2>
+          <div style="display:flex; flex-direction:column; gap:1rem; margin:1.5rem 0;">
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">1. Resource Owner (The User)</h3>
+              <p>An entity capable of granting access to a protected resource (e.g., the end-user).</p>
             </div>
-            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
-              <strong>Client</strong>: The application requesting access on behalf of the Resource Owner.
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">2. Resource Server (The Protected API)</h3>
+              <p>The server hosting protected user resources that validates and accepts OAuth Bearer tokens.</p>
             </div>
-            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
-              <strong>Authorization Server</strong>: The server that authenticates the user and issues access tokens to the Client.
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">3. Client (The Application)</h3>
+              <p>The application making protected resource requests on behalf of the Resource Owner.</p>
             </div>
-            <div style="border:1px solid #ccc; padding:1rem; border-radius:4px;">
-              <strong>Resource Server</strong>: The API server that hosts the user's data and accepts access tokens.
+            <div style="background:var(--surface); border:1px solid var(--border); padding:1rem; border-radius:var(--radius);">
+              <h3 style="color:var(--primary); margin-top:0;">4. Authorization Server (Identity Provider)</h3>
+              <p>The server issuing access tokens to the Client after successfully authenticating the Resource Owner and obtaining authorization.</p>
             </div>
           </div>
         </section>
 
+        <!-- API KEYS VS OAUTH -->
+        <section id="api-keys-vs-oauth">
+          <h2>API Keys vs OAuth 2.0 Tokens</h2>
+          <p>Why static API keys fail for enterprise applications compared to OAuth tokens:</p>
+          <pre><code><span class="c">// 1. Static API Key Request (Insecure: static, broad, no user context)</span>
+GET /api/reports HTTP/1.1
+Host: api.example.com
+X-API-Key: secret_live_abcdef123456789
+
+<span class="c">// 2. OAuth 2.0 Bearer Token Request (Secure: scoped, short-lived, signed)</span>
+GET /api/reports HTTP/1.1
+Host: api.example.com
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...</code></pre>
+
+          <table>
+            <thead>
+              <tr><th>Security Dimension</th><th>Static API Key</th><th>OAuth 2.0 Bearer Token</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>User Context</strong></td><td>None (Application-level only)</td><td>Bound to specific user (<code>sub</code> claim)</td></tr>
+              <tr><td><strong>Lifetime</strong></td><td>Long-lived / Indefinite</td><td>Short-lived (15–60 mins)</td></tr>
+              <tr><td><strong>Revocation</strong></td><td>Hard (Requires code redeploy)</td><td>Instantaneous via token revocation or expiration</td></tr>
+              <tr><td><strong>Scopes</strong></td><td>Coarse / All-or-nothing</td><td>Granular permissions (<code>read:reports</code>)</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- SCOPES -->
         <section id="scopes">
-          <h2>Scopes &amp; Consent</h2>
-          <p>Scopes define exactly what access the Client is requesting. When a user logs in, they are presented with a consent screen asking them to approve these specific scopes.</p>
+          <h2>OAuth Scopes &amp; Consent</h2>
+          <p>Scopes are space-separated strings defining the boundaries of requested access. During authorization, the user is presented with a consent screen enumerating these permissions.</p>
           <div class="callout note">
-            <strong>Example Scopes:</strong> <code>read:contacts</code>, <code>write:calendar</code>, <code>openid profile email</code>
+            <strong>Common Examples:</strong>
+            <ul>
+              <li><code>read:users write:users</code> (Custom API permissions)</li>
+              <li><code>openid profile email</code> (OIDC standard scopes)</li>
+            </ul>
           </div>
         </section>
 
+        <!-- CLIENTS -->
         <section id="clients">
           <h2>Public vs Confidential Clients</h2>
-          <p>Clients are categorized by their ability to keep a secret secure.</p>
+          <p>RFC 6749 categorizes clients by their ability to keep credentials confidential:</p>
           <ul>
-            <li><strong>Confidential Clients</strong>: Applications that execute on a secure server (e.g., Node.js, Java) and can safely store a <code>client_secret</code>.</li>
-            <li><strong>Public Clients</strong>: Applications that execute in the browser (SPAs) or on a mobile device. They cannot safely store a secret, as the source code or binary can be inspected.</li>
+            <li><strong>Confidential Clients:</strong> Server-side web applications running in secure backend environments (Node.js, Java, Python). They can safely maintain a <code>client_secret</code>.</li>
+            <li><strong>Public Clients:</strong> Single Page Apps (React, Vue) or Native Mobile Apps (iOS, Android). The source code and binary can be decompiled; <strong>they can NEVER keep a secret</strong>.</li>
           </ul>
           <div class="callout danger">
-            <strong>Security Rule:</strong> Never embed a <code>client_secret</code> in client-side JavaScript or a mobile app.
+            <strong>⚠️ Security Rule:</strong> Never distribute a <code>client_secret</code> in client-side JavaScript or an app distributed through public App Stores. Use <strong>Authorization Code + PKCE</strong> instead.
           </div>
         </section>
 
+        <!-- CHANNELS -->
         <section id="channels">
           <h2>Front Channel vs Back Channel</h2>
-          <p>OAuth communications happen over two different channels:</p>
+          <p>OAuth 2.0 segregates interactions across two distinct network paths:</p>
           <ul>
-            <li><strong>Front Channel</strong>: Communication happens via the user's browser URL. This is visible to the user and browser extensions. Used for authorization requests and redirects.</li>
-            <li><strong>Back Channel</strong>: Secure, server-to-server HTTPS POST requests. Invisible to the user. Used for token exchange and API calls.</li>
+            <li><strong>Front Channel:</strong> Carried out via user browser redirects (e.g., <code>GET /authorize</code>). Visible in browser history and logs; must only carry transient authorization codes, never raw tokens or client secrets.</li>
+            <li><strong>Back Channel:</strong> Direct server-to-server TLS encrypted HTTPS POST requests (e.g., <code>POST /token</code>). Used for exchanging codes for access tokens and validating credentials.</li>
           </ul>
         </section>
 
+        <!-- FRAMEWORK VARIANCE -->
+        <section id="framework-variance">
+          <h2>OAuth 2.0: Framework vs Protocol Variance</h2>
+          <div class="callout warning">
+            <strong>⚠️ Architectural Variance &amp; Normalization:</strong>
+            <p>OAuth 2.0 is defined as an <em>Authorization Framework</em> rather than a rigid protocol. As a result, vendors (Okta, Microsoft Entra ID, Ping, Auth0) implement parameter options, token payload formats, and role mappings differently.</p>
+            <p>Enterprise applications and API Gateways (such as Azure APIM) must implement <strong>claim normalization adapters</strong> to map vendor-specific claims (e.g. Okta <code>groups</code> vs Entra <code>roles</code>) into a unified permission model.</p>
+          </div>
+        </section>
+
+        <!-- ENDPOINTS -->
         <section id="endpoints">
-          <h2>OAuth Endpoints</h2>
-          <p>The standard defines several HTTP endpoints (RFC 6749 Section 3, plus extensions):</p>
+          <h2>OAuth 2.0 Endpoints (RFC 6749, RFC 7662, RFC 7009)</h2>
           <ul>
-            <li><code>/authorize</code>: Front-channel endpoint where the user logs in and grants consent.</li>
-            <li><code>/token</code>: Back-channel endpoint where the client exchanges a code for tokens.</li>
-            <li><code>/introspect</code> (RFC 7662): Endpoint for APIs to validate a token.</li>
-            <li><code>/revoke</code> (RFC 7009): Endpoint to invalidate a token.</li>
+            <li><code>/authorize</code>: Front-channel endpoint for user authentication and consent.</li>
+            <li><code>/token</code>: Back-channel endpoint for code and refresh token exchanges.</li>
+            <li><code>/introspect</code> (RFC 7662): Resource server endpoint to verify token status and metadata.</li>
+            <li><code>/revoke</code> (RFC 7009): Endpoint for explicit client-side token revocation.</li>
           </ul>
         </section>
 
+        <!-- SECURITY CHECKLIST -->
         <section id="security">
-          <h2>Security Checklist</h2>
-          <p>Based on the latest BCPs (RFC 9700):</p>
+          <h2>Web Security 101 Checklist (RFC 9700)</h2>
           <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem;">
-            <div><input type="checkbox" checked disabled> <label>Use the <code>state</code> parameter to prevent CSRF.</label></div>
-            <div><input type="checkbox" checked disabled> <label>Require PKCE for all clients (including confidential clients).</label></div>
-            <div><input type="checkbox" checked disabled> <label>Strictly whitelist absolute Redirect URIs.</label></div>
-            <div><input type="checkbox" checked disabled> <label>Use short-lived access tokens and rotate refresh tokens.</label></div>
-            <div><input type="checkbox" checked disabled> <label>Use HTTPS everywhere.</label></div>
+            <div>&#9989; <strong>Always use <code>state</code>:</strong> Cryptographic random string to guarantee flow integrity and defeat CSRF.</div>
+            <div>&#9989; <strong>Always use PKCE:</strong> Proof Key for Code Exchange (RFC 7636) for public and confidential clients.</div>
+            <div>&#9989; <strong>Strict Redirect URI Whitelisting:</strong> Validate exact URL matches to prevent token harvesting redirects.</div>
+            <div>&#9989; <strong>Bind <code>client_id</code>:</strong> Ensure token requests bind the grant code to the same client ID.</div>
+            <div>&#9989; <strong>Short Token Lifetimes:</strong> Use 15–60 minute access tokens with refresh token rotation.</div>
           </div>
         </section>
 

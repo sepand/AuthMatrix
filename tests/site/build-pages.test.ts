@@ -12,6 +12,7 @@ describe('Tier 3 Site: Static Page Generation & Structure (apps/learn-site/dist)
     { relativePath: 'flows/index.html',        name: 'Module 2: Grants & PKCE', expectedTitle: 'Grant' },
     { relativePath: 'oidc/index.html',         name: 'Module 3: OpenID Connect',expectedTitle: 'OIDC|OpenID' },
     { relativePath: 'tokens/index.html',       name: 'Module 4: Tokens & JWT',  expectedTitle: 'Token' },
+    { relativePath: 'api-guide/index.html',    name: 'API Architecture Guide',  expectedTitle: 'API' },
     { relativePath: 'labs/index.html',         name: 'Labs Hub',                expectedTitle: 'Lab' },
     { relativePath: 'labs/lab-01/index.html',  name: 'Lab 1: Local RBAC',       expectedTitle: 'Lab 1' },
     { relativePath: 'labs/lab-02/index.html',  name: 'Lab 2: Okta OIDC',        expectedTitle: 'Lab 2' },
